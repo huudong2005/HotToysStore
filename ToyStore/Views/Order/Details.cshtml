@@ -1,99 +1,83 @@
-@model ToyStore.Models.Order
+@model ToyStore.Domain.Entities.Order
 
 @{
     ViewData["Title"] = "Chi tiết đơn hàng";
+
+    (string label, string css) StatusBadge(string? status) => status switch
+    {
+        "Pending" => ("Chờ xác nhận", "cod-badge--pending"),
+        "Confirmed" => ("Đã xác nhận", "cod-badge--success"),
+        "Processing" => ("Đang xử lý", "cod-badge--info"),
+        "Shipped" => ("Đang giao", "cod-badge--primary"),
+        "Delivered" => ("Đã giao", "cod-badge--success"),
+        "Cancelled" => ("Đã hủy", "cod-badge--danger"),
+        _ => (string.IsNullOrEmpty(status) ? "Không rõ" : status, "cod-badge--secondary")
+    };
+
+    string PaymentLabel(string? method) => method switch
+    {
+        "COD" => "Thanh toán khi nhận hàng",
+        "BankTransfer" => "Chuyển khoản ngân hàng",
+        _ => string.IsNullOrWhiteSpace(method) ? "—" : method
+    };
+
+    var badge = StatusBadge(Model.Status);
+    var itemCount = Model.OrderDetails?.Sum(d => d.Quantity) ?? 0;
 }
 
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-receipt"></i> Chi tiết đơn hàng #@Model.OrderId</h2>
-        <a href="/Order/MyOrders" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Quay lại
-        </a>
+<div class="container cod">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-receipt me-2"></i>Chi tiết đơn hàng #@Model.OrderId</h2>
+            <p class="text-muted mb-0"><i class="far fa-clock me-1"></i>@(Model.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "—")</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="cod-badge @badge.css">@badge.label</span>
+            <a href="/Order/MyOrders" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
+        </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Thông tin đơn hàng</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <strong>Mã đơn hàng:</strong> #@Model.OrderId
+    <div class="row g-4">
+        <!-- Cột chính: đơn hàng + sản phẩm -->
+        <div class="col-lg-8">
+            <div class="cod-card mb-4">
+                <div class="cod-card__head"><i class="fas fa-circle-info me-2"></i>Thông tin đơn hàng</div>
+                <div class="cod-card__body">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <span class="cod-field__label">Mã đơn hàng</span>
+                            <span class="cod-field__value">#@Model.OrderId</span>
                         </div>
-                        <div class="col-md-6">
-                            <strong>Ngày đặt:</strong> @(Model.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")
+                        <div class="col-sm-6">
+                            <span class="cod-field__label">Ngày đặt</span>
+                            <span class="cod-field__value">@(Model.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "—")</span>
                         </div>
-                    </div>
-                    
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <strong>Trạng thái:</strong>
-                            <span class="badge @(Model.Status switch {
-                                "Pending" => "bg-warning",
-                                "Confirmed" => "bg-success",
-                                "Processing" => "bg-info", 
-                                "Shipped" => "bg-primary",
-                                "Delivered" => "bg-success",
-                                "Cancelled" => "bg-danger",
-                                _ => "bg-secondary"
-                            }) ms-2">
-                                @(Model.Status switch {
-                                    "Pending" => "Chờ xác nhận",
-                                    "Confirmed" => "Đã xác nhận",
-                                    "Processing" => "Đang xử lý",
-                                    "Shipped" => "Đang giao",
-                                    "Delivered" => "Đã giao",
-                                    "Cancelled" => "Đã hủy",
-                                    _ => Model.Status
-                                })
-                            </span>
+                        <div class="col-sm-6">
+                            <span class="cod-field__label">Phương thức thanh toán</span>
+                            <span class="cod-field__value">@PaymentLabel(Model.PaymentMethod)</span>
                         </div>
-                        <div class="col-md-6">
-                            <strong>Tổng tiền:</strong>
-                            <span class="text-success fw-bold">@Model.TotalAmount.ToString("N0") ₫</span>
+                        <div class="col-sm-6">
+                            <span class="cod-field__label">Phương thức giao</span>
+                            <span class="cod-field__value">@(string.IsNullOrWhiteSpace(Model.DeliveryMethod) ? "—" : Model.DeliveryMethod)</span>
                         </div>
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(Model.PaymentMethod))
-                    {
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <strong>Phương thức thanh toán:</strong>
-                                @(Model.PaymentMethod switch {
-                                    "COD" => "Thanh toán khi nhận hàng",
-                                    "BankTransfer" => "Chuyển khoản ngân hàng",
-                                    _ => Model.PaymentMethod
-                                })
-                            </div>
-                        </div>
-                    }
-
-                    <div class="mb-3">
-                        <strong>Thông tin khách hàng:</strong>
-                        <p class="mt-1">@(Model.Customer?.FullName ?? "Không xác định")</p>
-                        <p class="mt-1">@(Model.Customer?.Email ?? "Không xác định")</p>
-                        <p class="mt-1">@(Model.Customer?.Phone ?? "Không xác định")</p>
-                        <p class="mt-1">@(Model.Customer?.Address ?? "Không xác định")</p>
                     </div>
                 </div>
             </div>
 
-            <div class="card mt-4">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">Danh sách sản phẩm</h5>
+            <div class="cod-card">
+                <div class="cod-card__head d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-box-open me-2"></i>Danh sách sản phẩm</span>
+                    <span class="text-muted small">@itemCount sản phẩm</span>
                 </div>
-                <div class="card-body">
+                <div class="cod-card__body p-0">
                     <div class="table-responsive">
-                        <table class="table table-striped">
+                        <table class="table cod-table align-middle mb-0">
                             <thead>
                                 <tr>
                                     <th>Sản phẩm</th>
-                                    <th>Giá</th>
-                                    <th>Số lượng</th>
-                                    <th>Thành tiền</th>
+                                    <th class="text-end">Giá</th>
+                                    <th class="text-center">SL</th>
+                                    <th class="text-end">Thành tiền</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -101,79 +85,87 @@
                                 {
                                     <tr>
                                         <td>
-                                            <div class="d-flex align-items-center">
+                                            <div class="d-flex align-items-center gap-3">
                                                 @if (detail.Product != null && !string.IsNullOrEmpty(detail.Product.ImageUrl))
                                                 {
-                                                    <img src="@detail.Product.ImageUrl" alt="@detail.Product.ProductName" class="me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                                                    <img src="@detail.Product.ImageUrl" alt="@detail.Product.ProductName" class="cod-thumb" />
                                                 }
                                                 else
                                                 {
-                                                    <div class="bg-light d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                                                        <i class="fas fa-image text-muted"></i>
-                                                    </div>
+                                                    <div class="cod-thumb cod-thumb--empty"><i class="fas fa-image"></i></div>
                                                 }
                                                 <div>
-                                                    <h6 class="mb-0">@(detail.Product?.ProductName ?? "Sản phẩm không tồn tại")</h6>
-                                                    <small class="text-muted">@(detail.Product?.Category?.CategoryName ?? "Không xác định")</small>
+                                                    <div class="cod-product-name">@(detail.Product?.ProductName ?? "Sản phẩm không tồn tại")</div>
+                                                    <div class="text-muted small">@(detail.Product?.Category?.CategoryName ?? "—")</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>@detail.UnitPrice.ToString("N0") ₫</td>
-                                        <td>@detail.Quantity</td>
-                                        <td class="fw-bold">@((detail.UnitPrice * detail.Quantity).ToString("N0")) ₫</td>
+                                        <td class="text-end">@detail.UnitPrice.ToString("#,##0") ₫</td>
+                                        <td class="text-center">@detail.Quantity</td>
+                                        <td class="text-end fw-semibold">@((detail.UnitPrice * detail.Quantity).ToString("#,##0")) ₫</td>
                                     </tr>
                                 }
                             </tbody>
-                            <tfoot>
-                                <tr class="table-success">
-                                    <th colspan="3">Tổng cộng:</th>
-                                    <th class="fs-5">@Model.TotalAmount.ToString("N0") ₫</th>
-                                </tr>
-                            </tfoot>
                         </table>
+                    </div>
+
+                    <div class="cod-summary-wrap">
+                        <div class="cod-summary">
+                            <span>Tạm tính</span>
+                            <span>@Model.Subtotal.ToString("#,##0") ₫</span>
+                        </div>
+                        @if (Model.DiscountValue > 0)
+                        {
+                            <div class="cod-summary cod-summary--discount">
+                                <span>Giảm giá</span>
+                                <span>- @Model.DiscountValue.ToString("#,##0") ₫</span>
+                            </div>
+                        }
+                        <hr class="cod-divider" />
+                        <div class="cod-summary cod-summary--total">
+                            <span>Tổng cộng</span>
+                            <span>@Model.TotalAmount.ToString("#,##0") ₫</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">Thông tin khách hàng</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <strong>Tên:</strong>
-                        <p class="mt-1">@(Model.Customer?.FullName ?? "Không xác định")</p>
+        <!-- Cột phụ: khách hàng + trạng thái -->
+        <div class="col-lg-4">
+            <div class="cod-card mb-4">
+                <div class="cod-card__head"><i class="fas fa-user me-2"></i>Thông tin khách hàng</div>
+                <div class="cod-card__body">
+                    <div class="cod-info">
+                        <span class="cod-field__label">Tên</span>
+                        <span class="cod-field__value">@(Model.Customer?.FullName ?? "—")</span>
                     </div>
-                    
-                    <div class="mb-3">
-                        <strong>Email:</strong>
-                        <p class="mt-1">@(Model.Customer?.Email ?? "Không xác định")</p>
+                    <div class="cod-info">
+                        <span class="cod-field__label">Email</span>
+                        <span class="cod-field__value">@(Model.Customer?.Email ?? "—")</span>
                     </div>
-                    
-                    <div class="mb-3">
-                        <strong>Số điện thoại:</strong>
-                        <p class="mt-1">@(Model.Customer?.Phone ?? "Không xác định")</p>
+                    <div class="cod-info">
+                        <span class="cod-field__label">Số điện thoại</span>
+                        <span class="cod-field__value">@(string.IsNullOrWhiteSpace(Model.Customer?.Phone) ? "—" : Model.Customer!.Phone)</span>
                     </div>
-                    
-                    <div class="mb-3">
-                        <strong>Địa chỉ:</strong>
-                        <p class="mt-1">@(Model.Customer?.Address ?? "Không xác định")</p>
+                    <div class="cod-info">
+                        <span class="cod-field__label">Địa chỉ</span>
+                        <span class="cod-field__value">@(string.IsNullOrWhiteSpace(Model.Customer?.Address) ? "—" : Model.Customer!.Address)</span>
                     </div>
                 </div>
             </div>
 
             @if (Model.Status == "Pending")
             {
-                <div class="card mt-3">
-                    <div class="card-body text-center">
-                        <h6 class="text-warning">Đơn hàng đang chờ xác nhận</h6>
-                        <p class="text-muted">Bạn có thể hủy đơn hàng này nếu chưa được xác nhận</p>
+                <div class="cod-card cod-status cod-status--pending">
+                    <div class="cod-card__body text-center">
+                        <i class="fas fa-hourglass-half cod-status__icon"></i>
+                        <h6 class="cod-status__title">Đơn hàng đang chờ xác nhận</h6>
+                        <p class="cod-status__text">Bạn có thể hủy đơn hàng này khi chưa được xác nhận.</p>
                         <form action="/Order/Cancel/@Model.OrderId" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-danger" 
+                            <button type="submit" class="btn btn-outline-danger"
                                     onclick="return confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')">
-                                <i class="fas fa-times"></i> Hủy đơn hàng
+                                <i class="fas fa-times me-1"></i>Hủy đơn hàng
                             </button>
                         </form>
                     </div>
@@ -181,26 +173,32 @@
             }
             else if (Model.Status == "Confirmed")
             {
-                <div class="card mt-3">
-                    <div class="card-body text-center">
-                        <h6 class="text-success">Đơn hàng đã được xác nhận</h6>
-                        <p class="text-muted">Cửa hàng đã xác nhận đơn hàng của bạn. Đơn hàng sẽ được xử lý và giao trong thời gian sớm nhất.</p>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Thông báo:</strong> Đơn hàng đã được xác nhận và không thể hủy.
-                        </div>
+                <div class="cod-card cod-status cod-status--success">
+                    <div class="cod-card__body text-center">
+                        <i class="fas fa-check-circle cod-status__icon"></i>
+                        <h6 class="cod-status__title">Đơn hàng đã được xác nhận</h6>
+                        <p class="cod-status__text">Đơn hàng sẽ được xử lý và giao trong thời gian sớm nhất. Đơn đã xác nhận không thể hủy.</p>
                     </div>
                 </div>
             }
             else if (Model.Status == "Delivered")
             {
-                <div class="card mt-3">
-                    <div class="card-body text-center">
-                        <h6 class="text-success">Đơn hàng đã được giao</h6>
-                        <p class="text-muted">Cảm ơn bạn đã mua sắm!</p>
-                        <a href="/" class="btn btn-primary">
-                            <i class="fas fa-shopping-bag"></i> Mua sắm tiếp
-                        </a>
+                <div class="cod-card cod-status cod-status--success">
+                    <div class="cod-card__body text-center">
+                        <i class="fas fa-box-open cod-status__icon"></i>
+                        <h6 class="cod-status__title">Đơn hàng đã được giao</h6>
+                        <p class="cod-status__text">Cảm ơn bạn đã mua sắm tại ToyStore!</p>
+                        <a href="/" class="btn btn-outline-light"><i class="fas fa-shopping-bag me-1"></i>Mua sắm tiếp</a>
+                    </div>
+                </div>
+            }
+            else if (Model.Status == "Cancelled")
+            {
+                <div class="cod-card cod-status cod-status--danger">
+                    <div class="cod-card__body text-center">
+                        <i class="fas fa-ban cod-status__icon"></i>
+                        <h6 class="cod-status__title">Đơn hàng đã bị hủy</h6>
+                        <p class="cod-status__text">Đơn hàng này đã được hủy.</p>
                     </div>
                 </div>
             }
@@ -209,60 +207,132 @@
 </div>
 
 <style>
-/* Fix text color in order details cards */
-.card-body {
-    color: #333 !important;
-}
+    .cod { color: var(--lux-white, #fff); }
 
-.card-body strong {
-    color: #333 !important;
-}
+    .cod h2 { font-family: 'Montserrat', sans-serif; font-weight: 300; letter-spacing: 0.06em; }
 
-.card-body p {
-    color: #666 !important;
-}
+    .cod-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.45rem 0.9rem;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
 
-.card-body h6 {
-    color: #333 !important;
-}
+    .cod-badge--pending { background: rgba(255,193,7,0.15); color: #ffc94d; border: 1px solid rgba(255,193,7,0.5); }
+    .cod-badge--success { background: rgba(40,167,69,0.15); color: #5cd47a; border: 1px solid rgba(40,167,69,0.5); }
+    .cod-badge--info { background: rgba(23,162,184,0.15); color: #4fd0e3; border: 1px solid rgba(23,162,184,0.5); }
+    .cod-badge--primary { background: rgba(74,144,255,0.15); color: #7eacff; border: 1px solid rgba(74,144,255,0.5); }
+    .cod-badge--danger { background: rgba(220,53,69,0.15); color: #ff7b87; border: 1px solid rgba(220,53,69,0.5); }
+    .cod-badge--secondary { background: rgba(255,255,255,0.08); color: #b3b3b3; border: 1px solid rgba(255,255,255,0.25); }
 
-.card-body .text-muted {
-    color: #6c757d !important;
-}
+    /* Card */
+    .cod-card {
+        background: var(--lux-surface, #111);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        border-radius: 6px;
+        overflow: hidden;
+    }
 
-.card-body .text-success {
-    color: #28a745 !important;
-}
+    .cod-card__head {
+        padding: 0.9rem 1.25rem;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.85rem;
+        color: var(--lux-white, #fff);
+    }
 
-.card-body .text-warning {
-    color: #ffc107 !important;
-}
+    .cod-card__body { padding: 1.25rem; }
 
-.card-body .text-info {
-    color: #17a2b8 !important;
-}
+    /* Field dạng nhãn trên + giá trị dưới */
+    .cod-field__label {
+        display: block;
+        color: var(--lux-faint, #808080);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.2rem;
+    }
 
-/* Fix table text color */
-.table td, .table th {
-    color: #333 !important;
-}
+    .cod-field__value { display: block; color: var(--lux-white, #fff); word-break: break-word; }
 
-.table .text-muted {
-    color: #6c757d !important;
-}
+    /* Info dạng hàng (cột khách hàng) */
+    .cod-info { padding: 0.55rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .cod-info:last-child { border-bottom: none; }
 
-.table .fw-bold {
-    color: #333 !important;
-}
+    /* Bảng sản phẩm */
+    .cod-table { color: var(--lux-white, #fff); }
 
-/* Fix alert text color */
-.alert {
-    color: #333 !important;
-}
+    .cod-table thead th {
+        background: transparent !important;
+        color: var(--lux-muted, #b3b3b3) !important;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.72rem;
+        font-weight: 500;
+    }
 
-.alert-info {
-    background-color: #d1ecf1 !important;
-    border-color: #bee5eb !important;
-    color: #0c5460 !important;
-}
+    .cod-table tbody td {
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+        vertical-align: middle;
+        padding: 0.85rem 0.75rem;
+    }
+
+    .cod-table tbody tr:last-child td { border-bottom: none !important; }
+
+    .cod-thumb { width: 52px; height: 52px; object-fit: cover; border-radius: 4px; background: #000; }
+    .cod-thumb--empty {
+        display: flex; align-items: center; justify-content: center;
+        color: var(--lux-faint, #808080);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .cod-product-name { font-weight: 500; color: var(--lux-white, #fff); }
+
+    /* Tổng tiền */
+    .cod-summary-wrap {
+        padding: 1rem 1.25rem 1.25rem;
+        border-top: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .cod-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.3rem 0;
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .cod-summary--discount span:last-child { color: #ff7b87; }
+    .cod-divider { border-color: var(--lux-line, rgba(255,255,255,0.12)); opacity: 1; }
+
+    .cod-summary--total {
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 1.25rem;
+        letter-spacing: 0.03em;
+    }
+
+    /* Khối trạng thái */
+    .cod-status__icon { font-size: 1.8rem; margin-bottom: 0.6rem; }
+    .cod-status__title { font-weight: 500; letter-spacing: 0.03em; }
+    .cod-status__text { color: var(--lux-muted, #b3b3b3); font-size: 0.88rem; }
+
+    .cod-status--pending { border-color: rgba(255,193,7,0.45); }
+    .cod-status--pending .cod-status__icon, .cod-status--pending .cod-status__title { color: #ffc94d; }
+
+    .cod-status--success { border-color: rgba(40,167,69,0.45); }
+    .cod-status--success .cod-status__icon, .cod-status--success .cod-status__title { color: #5cd47a; }
+
+    .cod-status--danger { border-color: rgba(220,53,69,0.45); }
+    .cod-status--danger .cod-status__icon, .cod-status--danger .cod-status__title { color: #ff7b87; }
 </style>

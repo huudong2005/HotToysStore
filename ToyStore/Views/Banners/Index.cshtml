@@ -1,0 +1,113 @@
+@model IEnumerable<ToyStore.Domain.Entities.Banner>
+
+@{
+    ViewData["Title"] = "Quản lý Banner";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-image me-2"></i> Quản lý Banner trang chủ</h2>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i> Thêm banner
+    </a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>@TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card bg-dark text-white">
+    <div class="card-body">
+        @if (Model.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Ảnh</th>
+                            <th>Tiêu đề</th>
+                            <th>Trạng thái</th>
+                            <th>Ngày tạo</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td><span class="badge bg-secondary">#@item.BannerId</span></td>
+                                <td>
+                                    <img src="@item.ImagePath" alt="@item.Title"
+                                         style="width: 140px; height: 70px; object-fit: cover; border-radius: 4px;" />
+                                </td>
+                                <td>@(string.IsNullOrWhiteSpace(item.Title) ? "(Không tiêu đề)" : item.Title)</td>
+                                <td>
+                                    @if (item.IsActive)
+                                    {
+                                        <span class="badge bg-success">Đang hiển thị</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Đã tắt</span>
+                                    }
+                                </td>
+                                <td><small>@item.CreatedAt.ToString("dd/MM/yyyy HH:mm")</small></td>
+                                <td class="text-center">
+                                    <div class="btn-group" role="group">
+                                        <form asp-action="ToggleActive" asp-route-id="@item.BannerId" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            @if (item.IsActive)
+                                            {
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Tắt hiển thị">
+                                                    <i class="fas fa-eye-slash"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="submit" class="btn btn-sm btn-outline-success" title="Bật hiển thị">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            }
+                                        </form>
+                                        <a asp-action="Edit" asp-route-id="@item.BannerId" class="btn btn-sm btn-warning" title="Sửa">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form asp-action="Delete" asp-route-id="@item.BannerId" method="post"
+                                              class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa banner này?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Xóa">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fas fa-image fa-3x text-muted mb-3"></i>
+                <h5>Chưa có banner nào</h5>
+                <a asp-action="Create" class="btn btn-primary mt-2">
+                    <i class="fas fa-plus me-2"></i>Thêm banner đầu tiên
+                </a>
+            </div>
+        }
+    </div>
+</div>

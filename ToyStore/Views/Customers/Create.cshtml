@@ -1,4 +1,4 @@
-@model ToyStore.Models.Customer
+@model ToyStore.Domain.Entities.Customer
 
 @{
     ViewData["Title"] = "Create";
@@ -50,8 +50,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <label asp-for="PasswordHash" class="form-label"></label>
-                            <input asp-for="PasswordHash" class="form-control" placeholder="Mật khẩu (hash)" />
+                            <label asp-for="PasswordHash" class="form-label">Mật khẩu</label>
+                            <input asp-for="PasswordHash" type="password" class="form-control" placeholder="Nhập mật khẩu" />
                             <span asp-validation-for="PasswordHash" class="text-danger"></span>
                         </div>
 

@@ -1,4 +1,7 @@
 using System.Text.Json;
+using ToyStore.Domain.Entities;
+using ToyStore.Domain.Interfaces;
+using ToyStore.Domain.Strategies;
 
 namespace ToyStore.Models
 {
@@ -6,7 +9,39 @@ namespace ToyStore.Models
     {
         public List<ShoppingCartItem> Items { get; set; } = new List<ShoppingCartItem>();
         
-        public decimal Total => Items.Sum(item => item.Total);
+        /// <summary>
+        /// Tên discount strategy được áp dụng (VipDiscount, SeasonalDiscount, NoDiscount)
+        /// </summary>
+        public string? DiscountStrategyName { get; set; }
+        
+        /// <summary>
+        /// Tổng tiền trước khi giảm giá: ∑(Quantity × UnitPrice)
+        /// </summary>
+        public decimal Subtotal => Items.Sum(item => item.Total);
+        
+        /// <summary>
+        /// Giá trị khuyến mãi (DiscountValue)
+        /// </summary>
+        public decimal DiscountValue
+        {
+            get
+            {
+                var strategy = DiscountStrategyFactory.CreateStrategy(DiscountStrategyName);
+                return strategy.CalculateDiscount(Subtotal);
+            }
+        }
+        
+        /// <summary>
+        /// Tổng tiền sau khi giảm giá: Total = ∑(Quantity × UnitPrice) – DiscountValue
+        /// </summary>
+        public decimal Total
+        {
+            get
+            {
+                var strategy = DiscountStrategyFactory.CreateStrategy(DiscountStrategyName);
+                return strategy.CalculateTotal(Subtotal);
+            }
+        }
         
         public int ItemCount => Items.Sum(item => item.Quantity);
         

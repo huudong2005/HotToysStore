@@ -2,6 +2,14 @@
 
 @{
     ViewData["Title"] = "Giỏ hàng";
+
+    // Trạng thái mã khuyến mãi (Voucher) đã áp dụng - khôi phục từ Session.
+    var appliedPromoCode = ViewBag.AppliedPromoCode as string;
+    decimal appliedPromoDiscount = ViewBag.AppliedDiscountValue == null ? 0m : (decimal)ViewBag.AppliedDiscountValue;
+    decimal finalAfterPromo = Model.Subtotal - appliedPromoDiscount;
+    if (finalAfterPromo < 0) finalAfterPromo = 0;
+
+    Func<decimal, string> vnd = amount => amount.ToString("#,##0", System.Globalization.CultureInfo.InvariantCulture) + "đ";
 }
 
 <div class="container">
@@ -44,38 +52,37 @@
                     <div class="card-body">
                         @foreach (var item in Model.Items)
                         {
-                            <div class="row align-items-center py-3 border-bottom">
-                                <div class="col-md-2">
+                            <div class="row align-items-center g-2 py-3 border-bottom cart-item-row">
+                                <div class="col-2">
                                     @if (!string.IsNullOrEmpty(item.ImageUrl))
                                     {
-                                        <img src="@item.ImageUrl" alt="@item.ProductName" class="img-fluid rounded" style="max-height: 80px; object-fit: cover;">
+                                        <img src="@item.ImageUrl" alt="@item.ProductName" class="img-fluid rounded" style="max-height: 70px; object-fit: cover;">
                                     }
                                     else
                                     {
-                                        <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 80px;">
+                                        <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 70px;">
                                             <i class="fas fa-image text-muted"></i>
                                         </div>
                                     }
                                 </div>
-                                <div class="col-md-4">
-                                    <h6 class="mb-1">@item.ProductName</h6>
+                                <div class="col-4">
+                                    <h6 class="mb-1 text-truncate">@item.ProductName</h6>
                                     <p class="text-success mb-0 fw-bold">@item.Price.ToString("N0") ₫</p>
                                 </div>
-                                <div class="col-md-3">
-                                    <form action="/Cart/Update" method="post" class="d-flex align-items-center">
-                                        <input type="hidden" name="productId" value="@item.ProductId" />
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="changeQuantity(@item.ProductId, @item.Quantity - 1)">-</button>
-                                        <input type="number" id="quantity-@item.ProductId" value="@item.Quantity" min="1" max="999" class="form-control text-center mx-2" style="width: 60px;" readonly />
-                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="changeQuantity(@item.ProductId, @item.Quantity + 1)">+</button>
-                                    </form>
+                                <div class="col-3">
+                                    <div class="d-flex align-items-center flex-nowrap justify-content-center gap-1 cart-qty-controls">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary cart-qty-btn" onclick="changeQuantity(@item.ProductId, @item.Quantity - 1)">-</button>
+                                        <input type="number" id="quantity-@item.ProductId" value="@item.Quantity" min="1" max="999" class="form-control form-control-sm text-center p-1 cart-qty-input" readonly />
+                                        <button type="button" class="btn btn-sm btn-outline-secondary cart-qty-btn" onclick="changeQuantity(@item.ProductId, @item.Quantity + 1)">+</button>
+                                    </div>
                                 </div>
-                                <div class="col-md-2">
-                                    <p class="text-success mb-0 fw-bold">@item.Total.ToString("N0") ₫</p>
+                                <div class="col-2 text-end">
+                                    <p class="text-success mb-0 fw-bold text-nowrap">@item.Total.ToString("N0") ₫</p>
                                 </div>
-                                <div class="col-md-1">
+                                <div class="col-1 text-end">
                                     <form action="/Cart/Remove" method="post" class="d-inline">
                                         <input type="hidden" name="productId" value="@item.ProductId" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Xóa sản phẩm">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger cart-remove-btn" title="Xóa sản phẩm">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </form>
@@ -93,7 +100,7 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between mb-2">
                             <span>Tạm tính:</span>
-                            <span>@Model.Total.ToString("N0") ₫</span>
+                            <span>@Model.Subtotal.ToString("N0") ₫</span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Phí vận chuyển:</span>
@@ -102,8 +109,32 @@
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
                             <strong>Tổng cộng:</strong>
-                            <strong class="text-success">@Model.Total.ToString("N0") ₫</strong>
+                            <strong class="text-success">@Model.Subtotal.ToString("N0") ₫</strong>
                         </div>
+
+                        <!-- ====== Mã khuyến mãi (Voucher) ====== -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" for="promoCodeInput">Mã khuyến mãi</label>
+                            <div class="input-group">
+                                <input type="text" id="promoCodeInput" class="form-control"
+                                       placeholder="Nhập mã khuyến mãi" value="@appliedPromoCode" />
+                                <button type="button" id="applyPromoBtn" class="btn btn-outline-primary">
+                                    <i class="fas fa-tag"></i> Áp dụng mã
+                                </button>
+                            </div>
+                            <small id="promoMessage" class="d-block mt-2 text-muted"></small>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Số tiền giảm:</span>
+                            <span class="text-success" id="promoDiscountDisplay">@vnd(appliedPromoDiscount)</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <strong>Thành tiền (sau giảm):</strong>
+                            <strong class="text-success" id="finalTotalDisplay">@vnd(finalAfterPromo)</strong>
+                        </div>
+                        <!-- ====== Hết khu vực mã khuyến mãi ====== -->
+
                         <div class="d-grid gap-2">
                             <a href="/Cart/Checkout" class="btn btn-success btn-lg">
                                 <i class="fas fa-credit-card"></i> Thanh toán
@@ -133,204 +164,188 @@
 </div>
 
 <style>
-/* Cart Page Styles */
+/* Cart Page - Luxury Cinematic Gallery */
 .container {
-    color: #fff;
+    color: var(--lux-white, #fff);
 }
 
-.cart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, rgba(26, 26, 46, 0.8), rgba(10, 10, 10, 0.8));
-    border: 2px solid #00ff88;
-    border-radius: 1rem;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-}
-
-.cart-header h2 {
-    color: #00ff88;
-    font-weight: 800;
-    margin: 0;
-    text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
-}
-
-.cart-header h2 i {
-    margin-right: 0.5rem;
-}
-
-.badge {
-    background: rgba(0, 255, 136, 0.1) !important;
-    border: 2px solid #00ff88 !important;
-    color: #00ff88 !important;
-    font-weight: 600;
-}
-
-.btn-outline-primary {
-    background: linear-gradient(135deg, #00ff88, #00ffff);
-    color: #000 !important;
-    border: none;
-    font-weight: 600;
-}
-
-.btn-outline-primary:hover {
-    background: linear-gradient(135deg, #00ffff, #00ff88);
-    transform: translateY(-2px);
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
-    color: #000 !important;
-}
-
+/* Panel giỏ hàng tối giản */
 .card {
-    background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(10, 10, 10, 0.9)) !important;
-    border: 2px solid #00ff88 !important;
-    border-radius: 1rem !important;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3) !important;
+    background: var(--lux-surface, #111) !important;
+    border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 
-.card-header {
-    background: linear-gradient(135deg, #00ff88, #00ffff) !important;
-    color: #000 !important;
-    font-weight: 700;
-    border-bottom: none !important;
+.card-header,
+.card-header.bg-light,
+.card-header.bg-primary {
+    background: transparent !important;
+    color: var(--lux-white, #fff) !important;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
 }
 
 .card-body {
-    color: #fff !important;
+    color: var(--lux-white, #fff) !important;
 }
 
 .card-body h6 {
-    color: #fff !important;
+    color: var(--lux-white, #fff) !important;
+    font-weight: 500;
 }
 
-.card-body p {
-    color: #00ff88 !important;
-}
-
-.btn-outline-secondary {
-    background: rgba(0, 255, 136, 0.1);
-    border: 1px solid #00ff88;
-    color: #00ff88;
-}
-
-.btn-outline-secondary:hover {
-    background: #00ff88;
-    color: #000;
-    border-color: #00ff88;
-}
-
-.btn-outline-danger {
-    background: rgba(255, 107, 107, 0.1);
-    border: 1px solid #ff6b6b;
-    color: #ff6b6b;
-}
-
-.btn-outline-danger:hover {
-    background: #ff6b6b;
-    color: #fff;
-    border-color: #ff6b6b;
-}
-
-.btn-success {
-    background: linear-gradient(135deg, #00ff88, #00ffff) !important;
-    color: #000 !important;
-    border: none !important;
-    font-weight: 600;
-}
-
-.btn-success:hover {
-    background: linear-gradient(135deg, #00ffff, #00ff88) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
-    color: #000 !important;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, #00ff88, #00ffff) !important;
-    color: #000 !important;
-    border: none !important;
-    font-weight: 600;
-}
-
-.btn-primary:hover {
-    background: linear-gradient(135deg, #00ffff, #00ff88) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
-    color: #000 !important;
-}
-
-.text-success {
-    color: #00ff88 !important;
+/* Giá: trắng thay vì xanh neon */
+.text-success,
+.card-body p.text-success {
+    color: var(--lux-white, #fff) !important;
 }
 
 .text-muted {
-    color: #b0b0ff !important;
+    color: var(--lux-muted, #b3b3b3) !important;
+}
+
+/* Badge ghost */
+.badge {
+    background: transparent !important;
+    border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+    color: var(--lux-muted, #b3b3b3) !important;
+    border-radius: 0 !important;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+/* Tất cả nút -> Ghost trắng */
+.btn-outline-primary,
+.btn-primary,
+.btn-success,
+.btn-outline-secondary,
+.btn-outline-danger {
+    background: transparent !important;
+    border: 1px solid var(--lux-white, #fff) !important;
+    color: var(--lux-white, #fff) !important;
+    border-radius: 0 !important;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    box-shadow: none !important;
+    transition: all 0.4s ease;
+}
+
+.btn-outline-primary:hover,
+.btn-primary:hover,
+.btn-success:hover,
+.btn-outline-secondary:hover,
+.btn-outline-danger:hover {
+    background: var(--lux-white, #fff) !important;
+    color: #000 !important;
+    transform: none;
+    box-shadow: none !important;
+}
+
+/* Nút +/- nhỏ giữ nhẹ nhàng */
+.btn-sm.btn-outline-secondary {
+    letter-spacing: 0;
+}
+
+/* Cụm điều chỉnh số lượng - gọn, không tràn ra ngoài cột */
+.cart-qty-controls {
+    max-width: 100%;
+}
+
+.cart-qty-btn {
+    flex: 0 0 auto;
+    width: 30px;
+    padding: 0.15rem 0;
+    line-height: 1;
+}
+
+.cart-qty-input {
+    flex: 0 1 48px;
+    width: 48px;
+    min-width: 40px;
+}
+
+.cart-remove-btn {
+    padding: 0.25rem 0.45rem;
+}
+
+/* Chặn nội dung tràn ngang khỏi panel danh sách sản phẩm */
+.cart-item-row {
+    overflow: hidden;
 }
 
 .border-bottom {
-    border-bottom: 1px solid rgba(0, 255, 136, 0.3) !important;
+    border-bottom: 1px solid var(--lux-line-soft, rgba(255,255,255,0.06)) !important;
 }
 
 hr {
-    border-color: rgba(0, 255, 136, 0.3) !important;
+    border-color: var(--lux-line, rgba(255,255,255,0.12)) !important;
 }
 
-.form-control {
-    background: rgba(26, 26, 46, 0.8) !important;
-    border: 1px solid #00ff88 !important;
-    color: #fff !important;
+.form-control,
+.form-select {
+    background: transparent !important;
+    border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+    color: var(--lux-white, #fff) !important;
+    border-radius: 0 !important;
 }
 
-.form-control:focus {
-    background: rgba(26, 26, 46, 0.9) !important;
-    border-color: #00ffff !important;
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.4) !important;
-    color: #fff !important;
+.form-control:focus,
+.form-select:focus {
+    background: transparent !important;
+    border-color: var(--lux-white, #fff) !important;
+    box-shadow: none !important;
+    color: var(--lux-white, #fff) !important;
 }
 
-.alert-success {
-    background: rgba(0, 255, 136, 0.1) !important;
-    border: 1px solid #00ff88 !important;
-    color: #00ff88 !important;
+.form-label {
+    color: var(--lux-muted, #b3b3b3) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.78rem;
 }
 
+.alert-success,
 .alert-danger {
-    background: rgba(255, 107, 107, 0.1) !important;
-    border: 1px solid #ff6b6b !important;
-    color: #ff6b6b !important;
+    background: var(--lux-surface, #111) !important;
+    border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+    color: var(--lux-white, #fff) !important;
+    border-radius: 0 !important;
 }
 
-/* Empty cart styling */
+.alert-success { border-left: 2px solid var(--lux-white, #fff) !important; }
+.alert-danger { border-left: 2px solid var(--lux-muted, #b3b3b3) !important; }
+
+/* Empty cart - tối giản */
 .text-center.py-5 {
-    background: linear-gradient(135deg, rgba(26, 26, 46, 0.8), rgba(10, 10, 10, 0.8));
-    border: 2px solid #00ff88;
-    border-radius: 1rem;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-    padding: 3rem !important;
+    background: transparent;
+    border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    border-radius: 0;
+    box-shadow: none;
+    padding: 4rem 2rem !important;
 }
 
 .text-center.py-5 i {
-    color: #00ff88 !important;
-    font-size: 4rem !important;
+    color: var(--lux-muted, #b3b3b3) !important;
 }
 
 .text-center.py-5 h4 {
-    color: #fff !important;
+    color: var(--lux-white, #fff) !important;
 }
 
 .text-center.py-5 p {
-    color: #b0b0ff !important;
+    color: var(--lux-muted, #b3b3b3) !important;
 }
 
 /* Responsive */
 @@media (max-width: 768px) {
-    .cart-header {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-    }
-    
     .d-flex.align-items-center {
         flex-direction: column;
         gap: 1rem;
@@ -362,3 +377,84 @@ function changeQuantity(productId, newQuantity) {
     form.submit();
 }
 </script>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        (function () {
+            const applyBtn = document.getElementById('applyPromoBtn');
+            const promoInput = document.getElementById('promoCodeInput');
+            if (!applyBtn || !promoInput) return;
+
+            function notify(type, message) {
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: type,
+                        text: message,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#198754'
+                    });
+                } else {
+                    alert(message);
+                }
+            }
+
+            function setMessage(message, ok) {
+                const el = document.getElementById('promoMessage');
+                if (!el) return;
+                el.textContent = message || '';
+                el.classList.remove('text-success', 'text-danger', 'text-muted');
+                el.classList.add(message ? (ok ? 'text-success' : 'text-danger') : 'text-muted');
+            }
+
+            async function applyPromo() {
+                const code = (promoInput.value || '').trim();
+                if (!code) {
+                    notify('warning', 'Vui lòng nhập mã khuyến mãi.');
+                    return;
+                }
+
+                applyBtn.disabled = true;
+                const originalHtml = applyBtn.innerHTML;
+                applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang áp dụng...';
+
+                try {
+                    const response = await fetch('/Cart/ApplyPromotion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ promoCode: code })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Cập nhật giao diện mượt mà, không reload trang.
+                        document.getElementById('promoDiscountDisplay').textContent = data.discountValueText;
+                        document.getElementById('finalTotalDisplay').textContent = data.finalTotalText;
+                        setMessage(data.message, true);
+                        notify('success', data.message);
+                    } else {
+                        // Áp mã lỗi -> reset hiển thị về 0.
+                        document.getElementById('promoDiscountDisplay').textContent = '0đ';
+                        setMessage(data.message, false);
+                        notify('error', data.message);
+                    }
+                } catch (err) {
+                    setMessage('Có lỗi xảy ra, vui lòng thử lại.', false);
+                    notify('error', 'Có lỗi xảy ra, vui lòng thử lại.');
+                } finally {
+                    applyBtn.disabled = false;
+                    applyBtn.innerHTML = originalHtml;
+                }
+            }
+
+            applyBtn.addEventListener('click', applyPromo);
+            promoInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyPromo();
+                }
+            });
+        })();
+    </script>
+}

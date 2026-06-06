@@ -1,4 +1,4 @@
-@model ToyStore.Models.Order
+@model ToyStore.Models.CheckoutPageViewModel
 
 @{
     ViewData["Title"] = "Thanh toán";
@@ -13,26 +13,70 @@
                     <h4 class="mb-0"><i class="fas fa-credit-card me-2"></i> Thông tin thanh toán</h4>
                 </div>
                 <div class="card-body">
-                    <form action="/Order/Create" method="post">
+                    <form asp-controller="Order" asp-action="Create" method="post">
+                        @Html.AntiForgeryToken()
+
+                        @if (Model.IsLoggedIn && Model.Customer != null)
+                        {
+                            <div class="alert checkout-info-alert mb-4">
+                                <h6 class="checkout-info-title">
+                                    <i class="fas fa-user-check me-2"></i> Thông tin giao hàng (tài khoản)
+                                </h6>
+                                <p class="checkout-info-text mb-1"><strong>@Model.Customer.FullName</strong></p>
+                                <p class="checkout-info-text mb-1">@Model.Customer.Email</p>
+                                <p class="checkout-info-text mb-1">@(Model.Customer.Phone ?? "—")</p>
+                                <p class="checkout-info-text mb-0">@(Model.Customer.Address ?? "—")</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert checkout-info-alert mb-3">
+                                <h6 class="checkout-info-title">
+                                    <i class="fas fa-user-clock me-2"></i> Mua hàng không cần đăng ký
+                                </h6>
+                                <p class="checkout-info-text mb-0">
+                                    Nhập thông tin bên dưới để giao hàng. Đã có tài khoản?
+                                    <a asp-controller="Auth" asp-action="Login" class="alert-link">Đăng nhập</a>
+                                </p>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestFullName">Họ và tên *</label>
+                                    <input type="text" class="form-control checkout-form-input" id="guestFullName"
+                                           name="guestFullName" value="@Model.Guest.FullName" required maxlength="100" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestEmail">Email *</label>
+                                    <input type="email" class="form-control checkout-form-input" id="guestEmail"
+                                           name="guestEmail" value="@Model.Guest.Email" required maxlength="100" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestPhone">Số điện thoại *</label>
+                                    <input type="tel" class="form-control checkout-form-input" id="guestPhone"
+                                           name="guestPhone" value="@Model.Guest.Phone" required maxlength="20" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestAddress">Địa chỉ giao hàng *</label>
+                                    <input type="text" class="form-control checkout-form-input" id="guestAddress"
+                                           name="guestAddress" value="@Model.Guest.Address" required maxlength="255" />
+                                </div>
+                            </div>
+                        }
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-4">
-                                    <label class="form-label checkout-form-label">
+                                    <label class="form-label checkout-form-label" for="paymentMethod">
                                         <i class="fas fa-credit-card me-2"></i>Phương thức thanh toán
                                     </label>
-                                    <select name="PaymentMethod" class="form-select checkout-form-select">
-                                        <option value="COD">Thanh toán khi nhận hàng (COD)</option>
+                                    <select name="paymentMethod" id="paymentMethod" class="form-select checkout-form-select">
+                                        <option value="COD" selected>Thanh toán khi nhận hàng (COD)</option>
                                         <option value="BankTransfer">Chuyển khoản ngân hàng</option>
+                                        <option value="VNPAY">Thanh toán VNPAY (Thẻ/QR)</option>
                                     </select>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="alert checkout-info-alert">
-                            <h6 class="checkout-info-title">
-                                <i class="fas fa-info-circle me-2"></i> Thông tin giao hàng
-                            </h6>
-                            <p class="checkout-info-text mb-0">Đơn hàng sẽ được giao đến địa chỉ đã đăng ký trong tài khoản của bạn.</p>
                         </div>
 
                         <div class="d-flex justify-content-between checkout-actions">
@@ -47,7 +91,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-4">
             <div class="card checkout-summary-card">
                 <div class="card-header checkout-summary-header">
@@ -82,7 +126,11 @@
                     <hr class="checkout-divider">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="checkout-summary-label">Tạm tính:</span>
-                        <span class="checkout-summary-value">@cart.Total.ToString("N0") ₫</span>
+                        <span class="checkout-summary-value">@cart.Subtotal.ToString("N0") ₫</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="checkout-summary-label">Khuyến mãi:</span>
+                        <span class="checkout-summary-value">-@cart.DiscountValue.ToString("N0") ₫</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="checkout-summary-label">Phí vận chuyển:</span>
@@ -95,232 +143,128 @@
                     </div>
                 </div>
             </div>
-
-            <div class="card checkout-benefits-card mt-3">
-                <div class="card-body">
-                    <h6 class="checkout-benefits-title">
-                        <i class="fas fa-info-circle me-2"></i> Thông tin giao hàng
-                    </h6>
-                    <ul class="list-unstyled checkout-benefits-list">
-                        <li><i class="fas fa-check me-2"></i> Giao hàng miễn phí toàn quốc</li>
-                        <li><i class="fas fa-check me-2"></i> Giao hàng trong 2-3 ngày làm việc</li>
-                        <li><i class="fas fa-check me-2"></i> Thanh toán khi nhận hàng (COD)</li>
-                        <li><i class="fas fa-check me-2"></i> Đổi trả trong 7 ngày</li>
-                    </ul>
-                </div>
-            </div>
         </div>
     </div>
 </div>
 
 <style>
-    /* Checkout Page Styles */
+    /* ===== Checkout - Luxury Cinematic Gallery ===== */
     .checkout-main-card,
-    .checkout-summary-card,
-    .checkout-benefits-card {
-        background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(10, 10, 10, 0.9)) !important;
-        border: 2px solid #00ff88 !important;
-        border-radius: 1rem !important;
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.3) !important;
-        color: #fff !important;
+    .checkout-summary-card {
+        background: var(--lux-surface, #111) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
     }
 
     .checkout-main-header,
     .checkout-summary-header {
-        background: linear-gradient(135deg, #00ff88, #00ffff) !important;
-        color: #000 !important;
-        font-weight: 700;
-        border-bottom: none !important;
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
     }
 
     .checkout-form-label {
-        color: #00ff88 !important;
-        font-weight: 600;
-        font-size: 1rem;
+        color: var(--lux-muted, #b3b3b3) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.78rem;
     }
 
-    .checkout-form-select {
-        background: rgba(26, 26, 46, 0.8) !important;
-        border: 2px solid #00ff88 !important;
-        color: #fff !important;
-        border-radius: 0.5rem;
+    .checkout-form-select,
+    .checkout-form-input {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
         padding: 0.75rem;
     }
 
-    .checkout-form-select:focus {
-        background: rgba(26, 26, 46, 0.9) !important;
-        border-color: #00ffff !important;
-        box-shadow: 0 0 15px rgba(0, 255, 136, 0.4) !important;
-        color: #fff !important;
+    .checkout-form-select:focus,
+    .checkout-form-input:focus {
+        background: transparent !important;
+        border-color: var(--lux-white, #fff) !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
     }
 
     .checkout-info-alert {
-        background: rgba(0, 255, 136, 0.1) !important;
-        border: 2px solid #00ff88 !important;
-        color: #00ff88 !important;
-        border-radius: 0.75rem;
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-left: 2px solid var(--lux-white, #fff) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0;
         padding: 1rem;
     }
 
-    .checkout-info-title {
-        color: #00ff88 !important;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
+    .checkout-info-title { color: var(--lux-white, #fff) !important; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; }
+    .checkout-info-text { color: var(--lux-muted, #b3b3b3) !important; }
+    .checkout-info-alert .alert-link { color: var(--lux-white, #fff) !important; text-decoration: underline; }
 
-    .checkout-info-text {
-        color: #b0b0ff !important;
-        font-size: 0.95rem;
+    /* Nút -> Ghost */
+    .checkout-btn-back,
+    .checkout-btn-confirm {
+        background: transparent !important;
+        border: 1px solid var(--lux-white, #fff) !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 0;
+        padding: 0.85rem 2rem;
+        transition: all 0.4s ease;
     }
 
     .checkout-btn-back {
-        background: rgba(108, 117, 125, 0.1) !important;
-        border: 2px solid #6c757d !important;
-        color: #6c757d !important;
-        font-weight: 600;
-        border-radius: 0.5rem;
-        padding: 0.75rem 1.5rem;
+        border-color: var(--lux-line, rgba(255,255,255,0.25)) !important;
+        color: var(--lux-muted, #b3b3b3) !important;
+    }
+
+    /* Nút xác nhận: nền đặc trắng để nhấn mạnh hành động chính */
+    .checkout-btn-confirm {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
     }
 
     .checkout-btn-back:hover {
-        background: #6c757d !important;
-        color: #fff !important;
-        border-color: #6c757d !important;
-        transform: translateY(-2px);
-        box-shadow: 0 0 15px rgba(108, 117, 125, 0.4);
-    }
-
-    .checkout-btn-confirm {
-        background: linear-gradient(135deg, #00ff88, #00ffff) !important;
+        background: var(--lux-white, #fff) !important;
         color: #000 !important;
-        border: none !important;
-        font-weight: 600;
-        border-radius: 0.5rem;
-        padding: 0.75rem 2rem;
+        border-color: var(--lux-white, #fff) !important;
     }
 
     .checkout-btn-confirm:hover {
-        background: linear-gradient(135deg, #00ffff, #00ff88) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-        color: #000 !important;
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
     }
 
-    .checkout-item-row {
-        padding: 0.75rem 0;
-        border-bottom: 1px solid rgba(0, 255, 136, 0.1);
-    }
-
-    .checkout-item-row:last-child {
-        border-bottom: none;
-    }
+    .checkout-product-name { color: var(--lux-white, #fff) !important; font-weight: 500; }
+    .checkout-product-quantity { color: var(--lux-muted, #b3b3b3) !important; }
+    .checkout-product-price { color: var(--lux-white, #fff) !important; }
+    .checkout-summary-label { color: var(--lux-muted, #b3b3b3) !important; }
+    .checkout-summary-value { color: var(--lux-white, #fff) !important; }
+    .checkout-shipping-free { color: var(--lux-white, #fff) !important; }
+    .checkout-total-label { color: var(--lux-white, #fff) !important; }
+    .checkout-total-value { color: var(--lux-white, #fff) !important; font-size: 1.3rem; }
+    .checkout-divider { border-color: var(--lux-line, rgba(255,255,255,0.12)) !important; }
 
     .checkout-product-image {
-        width: 60px;
-        height: 60px;
-        object-fit: cover;
-        border: 2px solid #00ff88;
-        border-radius: 0.75rem;
+        width: 60px; height: 60px; object-fit: cover;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)); border-radius: 4px;
     }
 
     .checkout-image-placeholder {
-        width: 60px;
-        height: 60px;
-        background: rgba(26, 26, 46, 0.8);
-        border: 2px solid #00ff88;
-        border-radius: 0.75rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #00ff88;
-        font-size: 1.2rem;
-    }
-
-    .checkout-product-name {
-        color: #fff !important;
-        font-weight: 600;
-        font-size: 1rem;
-    }
-
-    .checkout-product-quantity {
-        color: #b0b0ff !important;
-        font-size: 0.9rem;
-    }
-
-    .checkout-product-price {
-        color: #00ff88 !important;
-        font-weight: 600;
-        font-size: 1rem;
-    }
-
-    .checkout-summary-label {
-        color: #b0b0ff !important;
-        font-weight: 500;
-    }
-
-    .checkout-summary-value {
-        color: #fff !important;
-        font-weight: 500;
-    }
-
-    .checkout-shipping-free {
-        color: #00ff88 !important;
-        font-weight: 600;
-    }
-
-    .checkout-total-label {
-        color: #fff !important;
-        font-size: 1.2rem;
-        font-weight: 700;
-    }
-
-    .checkout-total-value {
-        color: #00ff88 !important;
-        font-size: 1.3rem;
-        font-weight: 700;
-    }
-
-    .checkout-divider {
-        border-color: rgba(0, 255, 136, 0.3) !important;
-        margin: 1rem 0;
-    }
-
-    .checkout-benefits-title {
-        color: #00ff88 !important;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-
-    .checkout-benefits-list {
-        color: #b0b0ff !important;
-    }
-
-    .checkout-benefits-list li {
-        margin-bottom: 0.75rem;
-        font-size: 0.95rem;
-    }
-
-    .checkout-benefits-list i {
-        color: #00ff88 !important;
-        font-size: 1rem;
-    }
-
-    /* Responsive */
-    @@media (max-width: 768px) {
-        .checkout-actions {
-            flex-direction: column;
-            gap: 1rem;
-        }
-        
-        .checkout-btn-back,
-        .checkout-btn-confirm {
-            width: 100%;
-        }
-        
-        .checkout-product-image,
-        .checkout-image-placeholder {
-            width: 50px;
-            height: 50px;
-        }
+        width: 60px; height: 60px;
+        background: var(--lux-bg, #0a0a0a);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)); border-radius: 4px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--lux-muted, #b3b3b3);
     }
 </style>

@@ -1,4 +1,4 @@
-@model ToyStore.Models.Product
+@model ToyStore.Domain.Entities.Product
 
 @{
     ViewData["Title"] = "Xóa sản phẩm";
@@ -73,11 +73,13 @@
                     </div>
                 </div>
 
-                <form action="/Products/DeleteConfirmed/@Model.ProductId" method="post" class="d-inline">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash"></i> Xác nhận xóa
-                    </button>
-                </form>
+                    <form asp-controller="Products" asp-action="Delete" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="ProductId" />
+
+                        <button type="submit" class="btn btn-danger">Xác nhận xóa</button>
+                        <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+                    </form>
                 <a href="/Products" class="btn btn-secondary">Hủy</a>
             </div>
         </div>

@@ -1,4 +1,4 @@
-@model ToyStore.Models.Product
+@model ToyStore.Domain.Entities.Product
 
 @{
     ViewData["Title"] = "Thêm sản phẩm mới";
@@ -6,89 +6,93 @@
 
 <div class="crud-theme">
     <div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0">Thêm sản phẩm mới</h4>
-            </div>
-            <div class="card-body">
-                <form action="/Products/Create" method="post">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Tên sản phẩm *</label>
-                                <input name="ProductName" class="form-control" placeholder="Nhập tên sản phẩm" required />
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label">Danh mục *</label>
-                                <select name="CategoryId" id="categorySelect" class="form-select" required>
-                                    <option value="">-- Chọn danh mục --</option>
-                                    @foreach (var category in ViewBag.Categories as List<ToyStore.Models.Category>)
-                                    {
-                                        <option value="@category.CategoryId">@category.CategoryName</option>
-                                    }
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Thêm sản phẩm mới</h4>
+                </div>
+                <div class="card-body">
+                    @* Sửa: Dùng asp-controller và asp-action *@
+                    <form asp-controller="Products" asp-action="Create" method="post">
+                        @* QUAN TRỌNG: Thêm mã bảo mật để tránh lỗi 400 *@
+                        @Html.AntiForgeryToken()
 
-                    <div class="mb-3">
-                        <label class="form-label">Mô tả</label>
-                        <textarea name="Description" class="form-control" rows="3" placeholder="Nhập mô tả sản phẩm"></textarea>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Giá bán (₫) *</label>
-                                <input name="Price" type="number" class="form-control" step="1000" min="0" placeholder="0" required />
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Tên sản phẩm *</label>
+                                    @* Dùng asp-for giúp binding dữ liệu chính xác hơn *@
+                                    <input asp-for="ProductName" class="form-control" placeholder="Nhập tên sản phẩm" required />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Danh mục *</label>
+                                    <select asp-for="CategoryId" id="categorySelect" class="form-select" required>
+                                        <option value="">-- Chọn danh mục --</option>
+                                        @foreach (var category in ViewBag.Categories as List<ToyStore.Domain.Entities.Category>)
+                                        {
+                                            <option value="@category.CategoryId">@category.CategoryName</option>
+                                        }
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Số lượng tồn kho *</label>
-                                <input name="Stock" type="number" class="form-control" min="0" placeholder="0" required />
+
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả</label>
+                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="Nhập mô tả sản phẩm"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Giá bán (₫) *</label>
+                                    <input asp-for="Price" type="number" class="form-control" step="1000" min="0" placeholder="0" required />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Số lượng tồn kho *</label>
+                                    <input asp-for="Stock" type="number" class="form-control" min="0" placeholder="0" required />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Trạng thái</label>
+                                    <select asp-for="Status" class="form-select">
+                                        <option value="true">Đang bán</option>
+                                        <option value="false">Ngừng bán</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Trạng thái</label>
-                                <select name="Status" class="form-select">
-                                    <option value="true">Đang bán</option>
-                                    <option value="false">Ngừng bán</option>
-                                </select>
-                            </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">URL hình ảnh</label>
+                            <input asp-for="ImageUrl" class="form-control" placeholder="https://example.com/image.jpg" />
+                            <small class="form-text text-muted">Nhập URL hình ảnh sản phẩm (tùy chọn)</small>
                         </div>
-                    </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">URL hình ảnh</label>
-                        <input name="ImageUrl" class="form-control" placeholder="https://example.com/image.jpg" />
-                        <small class="form-text text-muted">Nhập URL hình ảnh sản phẩm (tùy chọn)</small>
-                    </div>
-
-                    <div class="d-flex justify-content-between">
-                        <a href="/Products" class="btn btn-secondary">Quay lại</a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Thêm sản phẩm
-                        </button>
-                    </div>
-                </form>
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Thêm sản phẩm
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
     </div>
 </div>
 
 @section Scripts {
     <script>
         $(document).ready(function() {
-            // Kích hoạt Select2 cho thẻ select có id='categorySelect'
             $('#categorySelect').select2({
-                theme: "bootstrap-5", // Dùng giao diện Bootstrap 5
-                dropdownParent: $('#categorySelect').parent() // Giúp Select2 hoạt động tốt hơn với Bootstrap
+                theme: "bootstrap-5",
+                dropdownParent: $('#categorySelect').parent()
             });
         });
     </script>

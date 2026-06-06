@@ -1,7 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ToyStore.Models;
+using Oracle.ManagedDataAccess.Client;
+using System.Data;
 using ToyStore.Attributes;
+using ToyStore.Domain.Entities;
+using ToyStore.Domain.Interfaces;
+using ToyStore.Infrastructure.Data;
+using ToyStore.Models;
 
 namespace ToyStore.Controllers
 {
@@ -9,41 +14,37 @@ namespace ToyStore.Controllers
     public class ProductsController : Controller
     {
         private readonly ToyStoreContext _context;
+        private readonly IProductRepository _productRepository; // Inject Repository vào đây
 
-        public ProductsController(ToyStoreContext context)
+        public ProductsController(ToyStoreContext context, IProductRepository productRepository)
         {
             _context = context;
+            _productRepository = productRepository;
         }
 
         // GET: Products
         public async Task<IActionResult> Index(string searchName, int? categoryId)
         {
-            var productsQuery = _context.Products
-                .Include(p => p.Category)
-                .AsQueryable();
+            // Tận dụng các phương thức đã viết trong Repository
+            IEnumerable<Product> products;
 
-            // Filter by product name if provided
             if (!string.IsNullOrEmpty(searchName))
             {
-                productsQuery = productsQuery.Where(p => p.ProductName.Contains(searchName));
+                products = await _productRepository.FilterProductsViaProcedureAsync(searchName, null, null, null);
             }
-
-            // Filter by category if provided
-            if (categoryId.HasValue && categoryId.Value > 0)
+            else if (categoryId.HasValue && categoryId.Value > 0)
             {
-                productsQuery = productsQuery.Where(p => p.CategoryId == categoryId.Value);
+                products = await _productRepository.GetProductsByCategoryAsync(categoryId.Value);
+            }
+            else
+            {
+                products = await _productRepository.GetAllAsync();
             }
 
-            var products = await productsQuery
-                .OrderBy(p => p.ProductName)
-                .ToListAsync();
-
-            // Get categories for dropdown
-            var categories = await _context.Categories.OrderBy(c => c.CategoryName).ToListAsync();
-            ViewBag.Categories = categories;
+            ViewBag.Categories = await _context.Categories.OrderBy(c => c.CategoryName).ToListAsync();
             ViewBag.SearchName = searchName;
             ViewBag.CategoryId = categoryId;
-            
+
             return View(products);
         }
 
@@ -61,58 +62,41 @@ namespace ToyStore.Controllers
         // GET: Products/Create
         public async Task<IActionResult> Create()
         {
-            var categories = await _context.Categories.ToListAsync();
-            ViewBag.Categories = categories;
+            ViewBag.Categories = await _context.Categories.ToListAsync();
             return View();
         }
 
-        // POST: Products/Create
+        // POST: Products/Create - SỬ DỤNG PROCEDURE QUA REPOSITORY
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Product product)
         {
-            try
+            // Loại bỏ kiểm tra Validation cho object Category vì chúng ta chỉ cần CategoryId
+            ModelState.Remove("Category");
+            ModelState.Remove("CartItems");
+            ModelState.Remove("OrderDetails");
+
+            if (ModelState.IsValid)
             {
-                // Validate required fields
-                if (string.IsNullOrEmpty(product.ProductName))
+                try
                 {
-                    TempData["ErrorMessage"] = "Tên sản phẩm không được để trống";
-                    var categories = await _context.Categories.ToListAsync();
-                    ViewBag.Categories = categories;
-                    return View(product);
+                    await _productRepository.AddProductViaProcedureAsync(product);
+                    TempData["SuccessMessage"] = "Thêm sản phẩm thành công!";
+                    return RedirectToAction(nameof(Index));
                 }
-
-                if (product.CategoryId <= 0)
+                catch (Exception ex)
                 {
-                    TempData["ErrorMessage"] = "Vui lòng chọn danh mục";
-                    var categories = await _context.Categories.ToListAsync();
-                    ViewBag.Categories = categories;
-                    return View(product);
+                    TempData["ErrorMessage"] = "Lỗi database: " + ex.Message;
                 }
-
-                // Set default values
-                if (product.Price <= 0) product.Price = 0;
-                if (product.Stock <= 0) product.Stock = 0;
-                if (product.Status == null) product.Status = true;
-
-                // Add product
-                _context.Products.Add(product);
-                await _context.SaveChangesAsync();
-                
-                TempData["SuccessMessage"] = "Thêm sản phẩm thành công!";
-                return RedirectToAction("Index");
-            }
-            catch (Exception ex)
-            {
-                TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
             }
 
-            var categoriesList = await _context.Categories.ToListAsync();
-            ViewBag.Categories = categoriesList;
+            // Nếu lỗi Validation (như thiếu tên sản phẩm), load lại Category cho Dropdown
+            ViewBag.Categories = await _context.Categories.ToListAsync();
             return View(product);
         }
 
         // GET: Products/Edit/5
-        public async Task<IActionResult> Edit(int id)
+        public async Task<IActionResult> Edit(int id) // Giữ nguyên tham số 'id' như cũ của bạn
         {
             var product = await _context.Products.FindAsync(id);
             if (product == null) return NotFound();
@@ -124,11 +108,12 @@ namespace ToyStore.Controllers
 
         // POST: Products/Edit/5
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, Product product)
         {
             try
             {
-                // Check if product exists
+                // 1. RÀNBUỘC 1: Kiểm tra sản phẩm có tồn tại hay không
                 var existingProduct = await _context.Products.FindAsync(id);
                 if (existingProduct == null)
                 {
@@ -136,46 +121,44 @@ namespace ToyStore.Controllers
                     return RedirectToAction("Index");
                 }
 
-                // Validate required fields
+                // 2. RÀNBUỘC 2: Kiểm tra tên sản phẩm không được để trống
                 if (string.IsNullOrEmpty(product.ProductName))
                 {
                     TempData["ErrorMessage"] = "Tên sản phẩm không được để trống";
-                    var categories = await _context.Categories.ToListAsync();
-                    ViewBag.Categories = categories;
+                    ViewBag.Categories = await _context.Categories.ToListAsync();
                     return View(product);
                 }
 
+                // 3. RÀNBUỘC 3: Kiểm tra tính hợp lệ của danh mục
                 if (product.CategoryId <= 0)
                 {
                     TempData["ErrorMessage"] = "Vui lòng chọn danh mục";
-                    var categories = await _context.Categories.ToListAsync();
-                    ViewBag.Categories = categories;
+                    ViewBag.Categories = await _context.Categories.ToListAsync();
                     return View(product);
                 }
 
-                // Update existing product properties
-                existingProduct.ProductName = product.ProductName;
-                existingProduct.CategoryId = product.CategoryId;
-                existingProduct.Description = product.Description;
-                existingProduct.Price = product.Price;
-                existingProduct.Stock = product.Stock;
-                existingProduct.ImageUrl = product.ImageUrl;
-                existingProduct.Status = product.Status;
+                // Loại bỏ Validation cho các Object liên kết để tránh lỗi 400 như file Product.cs thiết lập
+                ModelState.Remove("Category");
+                ModelState.Remove("CartItems");
+                ModelState.Remove("OrderDetails");
 
-                // Update product
-                _context.Products.Update(existingProduct);
-                await _context.SaveChangesAsync();
-                
-                TempData["SuccessMessage"] = "Cập nhật sản phẩm thành công!";
-                return RedirectToAction("Index");
+                if (ModelState.IsValid)
+                {
+                    // Thay vì dùng _context.Products.Update(existingProduct) như cũ,
+                    // Chúng ta gọi Procedure của Oracle để thực hiện cập nhật
+                    await _productRepository.UpdateProductViaProcedureAsync(product);
+
+                    TempData["SuccessMessage"] = "Cập nhật sản phẩm thành công qua Stored Procedure!";
+                    return RedirectToAction("Index");
+                }
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
             }
 
-            var categoriesList = await _context.Categories.ToListAsync();
-            ViewBag.Categories = categoriesList;
+            // Nếu có lỗi xảy ra hoặc ModelState không hợp lệ, trả về View kèm danh sách Categories
+            ViewBag.Categories = await _context.Categories.ToListAsync();
             return View(product);
         }
 
@@ -185,86 +168,45 @@ namespace ToyStore.Controllers
             var product = await _context.Products
                 .Include(p => p.Category)
                 .FirstOrDefaultAsync(m => m.ProductId == id);
-            
+
             if (product == null) return NotFound();
             return View(product);
         }
 
         // POST: Products/Delete/5
-        [HttpPost]
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             try
             {
-                // First, check if product exists
+                // 1. Kiểm tra xem sản phẩm thực sự tồn tại trước khi ra lệnh xóa không
                 var product = await _context.Products.FindAsync(id);
                 if (product == null)
                 {
-                    TempData["ErrorMessage"] = "Sản phẩm không tồn tại";
+                    TempData["ErrorMessage"] = "Sản phẩm không tồn tại hoặc đã bị xóa trước đó.";
                     return RedirectToAction("Index");
                 }
 
-                // Check if product is used in orders
-                bool hasOrderDetails = await _context.OrderDetails
-                    .AnyAsync(od => od.ProductId == id);
+                // 2. Gọi Procedure xử lý xóa/ẩn và lấy kết quả trả về
+                int resultCode = await _productRepository.DeleteProductViaProcedureAsync(id);
 
-                // Check if product is used in cart items
-                bool hasCartItems = await _context.CartItems
-                    .AnyAsync(ci => ci.ProductId == id);
-
-                if (hasOrderDetails || hasCartItems)
+                // 3. Đưa ra thông báo dựa theo logic Oracle đã xử lý
+                if (resultCode == 1)
                 {
-                    // Instead of deleting, set status to false (not selling)
-                    product.Status = false;
-                    _context.Products.Update(product);
-                    await _context.SaveChangesAsync();
-                    
-                    string reason = "";
-                    if (hasOrderDetails && hasCartItems)
-                        reason = "Sản phẩm đã được sử dụng trong đơn hàng và giỏ hàng";
-                    else if (hasOrderDetails)
-                        reason = "Sản phẩm đã được sử dụng trong đơn hàng";
-                    else
-                        reason = "Sản phẩm đang có trong giỏ hàng";
-                    
-                    TempData["SuccessMessage"] = $"Không thể xóa sản phẩm vì {reason}. Đã chuyển trạng thái thành 'Không bán'.";
+                    TempData["SuccessMessage"] = "Xóa sản phẩm thành công khỏi hệ thống!";
                 }
-                else
+                else if (resultCode == 2)
                 {
-                    // Safe to delete - remove the product
-                    _context.Products.Remove(product);
-                    await _context.SaveChangesAsync();
-                    TempData["SuccessMessage"] = "Xóa sản phẩm thành công!";
-                }
-            }
-            catch (DbUpdateException dbEx)
-            {
-                // Handle database constraint violations
-                TempData["ErrorMessage"] = "Không thể xóa sản phẩm vì sản phẩm đang được sử dụng trong hệ thống. Đã chuyển trạng thái thành 'Không bán'.";
-                
-                // Try to set status to false instead
-                try
-                {
-                    var product = await _context.Products.FindAsync(id);
-                    if (product != null)
-                    {
-                        product.Status = false;
-                        _context.Products.Update(product);
-                        await _context.SaveChangesAsync();
-                        TempData["SuccessMessage"] = "Đã chuyển trạng thái sản phẩm thành 'Không bán'.";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
+                    TempData["SuccessMessage"] = "Sản phẩm đã phát sinh đơn hàng hoặc giỏ hàng nên hệ thống tự động chuyển trạng thái thành 'Ngừng bán'.";
                 }
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
+                TempData["ErrorMessage"] = "Lỗi khi xử lý xóa sản phẩm: " + ex.Message;
             }
 
-            return RedirectToAction("Index");
+            return RedirectToAction(nameof(Index));
         }
     }
 }

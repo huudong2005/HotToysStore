@@ -7,23 +7,29 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ToyStore.Models;
 using ToyStore.Attributes;
+using ToyStore.Domain.Events;
+using ToyStore.Domain.Interfaces;
+using ToyStore.Domain.Entities;
+using ToyStore.Infrastructure.Data;
 
 namespace ToyStore.Controllers
 {
     [AuthorizeRole("Admin", "Staff")]
     public class OrdersController : Controller
     {
-        private readonly ToyStoreContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IOrderEventDispatcher _orderEventDispatcher;
 
-        public OrdersController(ToyStoreContext context)
+        public OrdersController(IUnitOfWork unitOfWork, IOrderEventDispatcher orderEventDispatcher)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
+            _orderEventDispatcher = orderEventDispatcher;
         }
 
         // GET: Orders
         public async Task<IActionResult> Index(string searchCustomer, string searchDate)
         {
-            var ordersQuery = _context.Orders
+            var ordersQuery = _unitOfWork.Orders.Query()
                 .Include(o => o.Customer)
                 .AsQueryable();
 
@@ -61,9 +67,7 @@ namespace ToyStore.Controllers
                 return NotFound();
             }
 
-            var order = await _context.Orders
-                .Include(o => o.Customer)
-                .FirstOrDefaultAsync(m => m.OrderId == id);
+            var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(id.Value);
             if (order == null)
             {
                 return NotFound();
@@ -73,9 +77,10 @@ namespace ToyStore.Controllers
         }
 
         // GET: Orders/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["CustomerId"] = new SelectList(_context.Customers, "CustomerId", "CustomerId");
+            var customers = await _unitOfWork.Customers.GetAllAsync();
+            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "CustomerId");
             return View();
         }
 
@@ -86,13 +91,50 @@ namespace ToyStore.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("OrderId,CustomerId,OrderDate,TotalAmount,Status,PaymentMethod,DeliveryMethod")] Order order)
         {
+            // Tránh ModelState false do navigation properties không submit từ form
+            ModelState.Remove("Customer");
+            ModelState.Remove("OrderDetails");
+
             if (ModelState.IsValid)
             {
-                _context.Add(order);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                try
+                {
+                    // Đảm bảo Status mặc định là Pending
+                    if (string.IsNullOrEmpty(order.Status))
+                    {
+                        order.Status = "Pending";
+                    }
+
+                    // Tự động lấy giờ hiện tại nếu chưa có
+                    if (!order.OrderDate.HasValue)
+                    {
+                        order.OrderDate = DateTime.Now;
+                    }
+
+                    await _unitOfWork.Orders.AddAsync(order);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    TempData["SuccessMessage"] = $"Tạo đơn hàng #{order.OrderId} thành công!";
+                    return RedirectToAction(nameof(Index));
+                }
+                catch (Exception ex)
+                {
+                    TempData["ErrorMessage"] = "Lỗi khi tạo đơn hàng: " + ex.Message;
+                }
             }
-            ViewData["CustomerId"] = new SelectList(_context.Customers, "CustomerId", "CustomerId", order.CustomerId);
+
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "Dữ liệu không hợp lệ." : e.ErrorMessage)
+                .ToList();
+
+            if (errors.Count > 0)
+            {
+                TempData["ErrorMessage"] = "Không thể tạo đơn hàng: " + string.Join(" | ", errors);
+            }
+
+            var customers = await _unitOfWork.Customers.GetAllAsync();
+            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "CustomerId", order.CustomerId);
             return View(order);
         }
 
@@ -104,12 +146,13 @@ namespace ToyStore.Controllers
                 return NotFound();
             }
 
-            var order = await _context.Orders.FindAsync(id);
+            var order = await _unitOfWork.Orders.GetByIdAsync(id.Value);
             if (order == null)
             {
                 return NotFound();
             }
-            ViewData["CustomerId"] = new SelectList(_context.Customers, "CustomerId", "CustomerId", order.CustomerId);
+            var customers = await _unitOfWork.Customers.GetAllAsync();
+            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "CustomerId", order.CustomerId);
             return View(order);
         }
 
@@ -129,12 +172,28 @@ namespace ToyStore.Controllers
             {
                 try
                 {
-                    _context.Update(order);
-                    await _context.SaveChangesAsync();
+                    var existingOrder = await _unitOfWork.Orders.GetByIdAsync(id);
+                    if (existingOrder == null)
+                    {
+                        return NotFound();
+                    }
+
+                    // Cập nhật các thuộc tính (không thay đổi Status trực tiếp, sử dụng State Pattern)
+                    existingOrder.CustomerId = order.CustomerId;
+                    existingOrder.OrderDate = order.OrderDate;
+                    existingOrder.TotalAmount = order.TotalAmount;
+                    existingOrder.PaymentMethod = order.PaymentMethod;
+                    existingOrder.DeliveryMethod = order.DeliveryMethod;
+                    
+                    // Status sẽ được quản lý bởi State Pattern, không set trực tiếp ở đây
+                    // Nếu cần thay đổi Status, sử dụng các action riêng (Confirm, Ship, Cancel)
+
+                    _unitOfWork.Orders.Update(existingOrder);
+                    await _unitOfWork.SaveChangesAsync();
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!OrderExists(order.OrderId))
+                    if (!await OrderExists(order.OrderId))
                     {
                         return NotFound();
                     }
@@ -145,7 +204,8 @@ namespace ToyStore.Controllers
                 }
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["CustomerId"] = new SelectList(_context.Customers, "CustomerId", "CustomerId", order.CustomerId);
+            var customers = await _unitOfWork.Customers.GetAllAsync();
+            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "CustomerId", order.CustomerId);
             return View(order);
         }
 
@@ -157,9 +217,7 @@ namespace ToyStore.Controllers
                 return NotFound();
             }
 
-            var order = await _context.Orders
-                .Include(o => o.Customer)
-                .FirstOrDefaultAsync(m => m.OrderId == id);
+            var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(id.Value);
             if (order == null)
             {
                 return NotFound();
@@ -168,82 +226,53 @@ namespace ToyStore.Controllers
             return View(order);
         }
 
-        // POST: Orders/Delete/5
+        // SỬA HÀM XÓA ĐƠN HÀNG
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             try
             {
-                // First, check if order exists
-                var order = await _context.Orders.FindAsync(id);
-                if (order == null)
-                {
-                    TempData["ErrorMessage"] = "Đơn hàng không tồn tại";
-                    return RedirectToAction("Index");
-                }
+                int resultCode = await _unitOfWork.Orders.DeleteOrderViaProcedureAsync(id);
 
-                // Check if order has order details
-                var orderDetails = await _context.OrderDetails
-                    .Where(od => od.OrderId == id)
-                    .ToListAsync();
-
-                if (orderDetails.Any())
+                if (resultCode == 1)
                 {
-                    // Delete order details first
-                    _context.OrderDetails.RemoveRange(orderDetails);
-                    
-                    // Then delete the order
-                    _context.Orders.Remove(order);
-                    
-                    await _context.SaveChangesAsync();
-                    TempData["SuccessMessage"] = $"Đã xóa đơn hàng #{id} và {orderDetails.Count} chi tiết sản phẩm thành công!";
+                    TempData["SuccessMessage"] = $"Xóa thành công đơn hàng #{id} và các chi tiết liên quan!";
                 }
                 else
                 {
-                    // Safe to delete - remove the order
-                    _context.Orders.Remove(order);
-                    await _context.SaveChangesAsync();
-                    TempData["SuccessMessage"] = "Xóa đơn hàng thành công!";
+                    TempData["ErrorMessage"] = "Lỗi khi xóa đơn hàng. Đơn hàng không tồn tại hoặc có lỗi cơ sở dữ liệu.";
                 }
-            }
-            catch (DbUpdateException dbEx)
-            {
-                // Handle database constraint violations
-                TempData["ErrorMessage"] = "Không thể xóa đơn hàng vì đơn hàng đang được sử dụng trong hệ thống. Đơn hàng sẽ được giữ lại để lưu trữ.";
             }
             catch (Exception ex)
             {
                 TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
             }
-
             return RedirectToAction("Index");
         }
 
-        // POST: Orders/Confirm/5
+        // SỬA HÀM XÁC NHẬN VÀ GIAO HÀNG (Làm tương tự cho Ship)
         [HttpPost]
         public async Task<IActionResult> Confirm(int id)
         {
             try
             {
-                var order = await _context.Orders.FindAsync(id);
-                if (order == null)
+                var order = await _unitOfWork.Orders.GetByIdAsync(id);
+                if (order == null) return NotFound();
+
+                if (!order.CanConfirm())
                 {
-                    TempData["ErrorMessage"] = "Đơn hàng không tồn tại";
+                    TempData["ErrorMessage"] = $"Không thể xác nhận đơn hàng ở trạng thái {order.GetState().StateName}.";
                     return RedirectToAction("Index");
                 }
 
-                if (order.Status == "Confirmed")
-                {
-                    TempData["WarningMessage"] = "Đơn hàng đã được xác nhận trước đó";
-                    return RedirectToAction("Index");
-                }
+                order.Confirm(); // Thay đổi state nội bộ
 
-                // Update order status to confirmed
-                order.Status = "Confirmed";
-                _context.Orders.Update(order);
-                await _context.SaveChangesAsync();
+                // Gọi Stored Procedure thay vì Entity Framework Update
+                await _unitOfWork.Orders.UpdateOrderStatusViaProcedureAsync(id, order.Status);
 
+                // Kích hoạt Event
+                await _orderEventDispatcher.PublishAsync(new OrderConfirmedEvent(order));
                 TempData["SuccessMessage"] = $"Đã xác nhận đơn hàng #{order.OrderId} thành công!";
                 return RedirectToAction("Index");
             }
@@ -254,31 +283,41 @@ namespace ToyStore.Controllers
             }
         }
 
-        // POST: Orders/Cancel/5
+        // POST: Orders/Ship/5
         [HttpPost]
-        public async Task<IActionResult> Cancel(int id)
+        public async Task<IActionResult> Ship(int id)
         {
             try
             {
-                var order = await _context.Orders.FindAsync(id);
+                var order = await _unitOfWork.Orders.GetByIdAsync(id);
                 if (order == null)
                 {
                     TempData["ErrorMessage"] = "Đơn hàng không tồn tại";
                     return RedirectToAction("Index");
                 }
 
-                if (order.Status == "Cancelled")
+                // Sử dụng State Pattern để giao hàng
+                if (!order.CanShip())
                 {
-                    TempData["WarningMessage"] = "Đơn hàng đã được hủy trước đó";
+                    var stateName = order.GetState().StateName;
+                    TempData["ErrorMessage"] = $"Không thể giao hàng ở trạng thái {stateName}. Chỉ có thể giao hàng khi đơn hàng đã được xác nhận (Confirmed).";
                     return RedirectToAction("Index");
                 }
 
-                // Update order status to cancelled
-                order.Status = "Cancelled";
-                _context.Orders.Update(order);
-                await _context.SaveChangesAsync();
+                // Sử dụng State Pattern để giao hàng
+                order.Ship();
+                _unitOfWork.Orders.Update(order);
+                await _unitOfWork.SaveChangesAsync();
 
-                TempData["SuccessMessage"] = $"Đã hủy đơn hàng #{order.OrderId} thành công!";
+                // Observer / Domain Events: publish sự kiện OrderShippedEvent
+                await _orderEventDispatcher.PublishAsync(new OrderShippedEvent(order));
+
+                TempData["SuccessMessage"] = $"Đã giao đơn hàng #{order.OrderId} thành công!";
+                return RedirectToAction("Index");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["ErrorMessage"] = ex.Message;
                 return RedirectToAction("Index");
             }
             catch (Exception ex)
@@ -288,9 +327,49 @@ namespace ToyStore.Controllers
             }
         }
 
-        private bool OrderExists(int id)
+        // POST: Orders/Cancel/5
+        // SỬA HÀM HỦY ĐƠN HÀNG (ĐÂY LÀ PHẦN LỢI HẠI NHẤT)
+        [HttpPost]
+        public async Task<IActionResult> Cancel(int id)
         {
-            return _context.Orders.Any(e => e.OrderId == id);
+            try
+            {
+                var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(id);
+                if (order == null) return NotFound();
+
+                if (!order.CanCancel())
+                {
+                    TempData["ErrorMessage"] = $"Không thể hủy đơn hàng ở trạng thái {order.GetState().StateName}.";
+                    return RedirectToAction("Index");
+                }
+
+                order.Cancel(); // Thay đổi state nội bộ sang 'Cancelled'
+
+                // 1 Dòng duy nhất thay cho cả khối Transaction và vòng lặp foreach cũ!
+                int resultCode = await _unitOfWork.Orders.CancelOrderAndRestoreStockViaProcedureAsync(id, order.Status);
+
+                if (resultCode == 1)
+                {
+                    await _orderEventDispatcher.PublishAsync(new OrderCancelledEvent(order));
+                    TempData["SuccessMessage"] = $"Đã hủy đơn hàng #{order.OrderId} và hoàn trả tồn kho thành công!";
+                }
+                else
+                {
+                    TempData["ErrorMessage"] = "Lỗi Database khi hủy đơn hàng và hoàn trả tồn kho.";
+                }
+                return RedirectToAction("Index");
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
+                return RedirectToAction("Index");
+            }
+        }
+
+        private async Task<bool> OrderExists(int id)
+        {
+            var order = await _unitOfWork.Orders.GetByIdAsync(id);
+            return order != null;
         }
     }
 }

@@ -1,21 +1,32 @@
-@model IEnumerable<ToyStore.Models.Order>
+@model IEnumerable<ToyStore.Domain.Entities.Order>
 
 @{
     ViewData["Title"] = "Đơn hàng của tôi";
+
+    (string label, string css) StatusBadge(string? status) => status switch
+    {
+        "Pending" => ("Chờ xác nhận", "mo-badge--pending"),
+        "Confirmed" => ("Đã xác nhận", "mo-badge--success"),
+        "Processing" => ("Đang xử lý", "mo-badge--info"),
+        "Shipped" => ("Đang giao", "mo-badge--primary"),
+        "Delivered" => ("Đã giao", "mo-badge--success"),
+        "Cancelled" => ("Đã hủy", "mo-badge--danger"),
+        _ => (string.IsNullOrEmpty(status) ? "Không rõ" : status, "mo-badge--secondary")
+    };
 }
 
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-receipt"></i> Đơn hàng của tôi</h2>
-        <a href="/" class="btn btn-primary">
-            <i class="fas fa-shopping-bag"></i> Tiếp tục mua sắm
+<div class="container my-orders">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <h2 class="mb-0"><i class="fas fa-receipt me-2"></i> Đơn hàng của tôi</h2>
+        <a href="/" class="btn btn-outline-light">
+            <i class="fas fa-shopping-bag me-2"></i> Tiếp tục mua sắm
         </a>
     </div>
 
     @if (TempData["SuccessMessage"] != null)
     {
         <div class="alert alert-success alert-dismissible fade show" role="alert">
-            @TempData["SuccessMessage"]
+            <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
@@ -23,91 +34,82 @@
     @if (TempData["ErrorMessage"] != null)
     {
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @TempData["ErrorMessage"]
+            <i class="fas fa-exclamation-triangle me-2"></i>@TempData["ErrorMessage"]
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
 
     @if (Model.Any())
     {
-        <div class="row">
+        <div class="row g-4">
             @foreach (var order in Model)
             {
-                <div class="col-md-6 mb-4">
-                    <div class="card">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">
-                                <i class="fas fa-receipt"></i> Đơn hàng #@order.OrderId
-                            </h6>
-                            <span class="badge @(order.Status switch {
-                                "Pending" => "bg-warning",
-                                "Confirmed" => "bg-success",
-                                "Processing" => "bg-info", 
-                                "Shipped" => "bg-primary",
-                                "Delivered" => "bg-success",
-                                "Cancelled" => "bg-danger",
-                                _ => "bg-secondary"
-                            })">
-                                @(order.Status switch {
-                                    "Pending" => "Chờ xác nhận",
-                                    "Confirmed" => "Đã xác nhận",
-                                    "Processing" => "Đang xử lý",
-                                    "Shipped" => "Đang giao",
-                                    "Delivered" => "Đã giao",
-                                    "Cancelled" => "Đã hủy",
-                                    _ => order.Status
-                                })
-                            </span>
+                var badge = StatusBadge(order.Status);
+                var itemCount = order.OrderDetails?.Sum(d => d.Quantity) ?? 0;
+                <div class="col-lg-6">
+                    <div class="mo-card">
+                        <div class="mo-card__head">
+                            <div class="mo-card__id">
+                                <i class="fas fa-box me-2"></i>Đơn hàng <span>#@order.OrderId</span>
+                            </div>
+                            <span class="mo-badge @badge.css">@badge.label</span>
                         </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-6">
-                                    <small class="text-muted">Ngày đặt:</small>
-                                    <p class="mb-1">@(order.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "N/A")</p>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted">Tổng tiền:</small>
-                                    <p class="mb-1 fw-bold text-success">@order.TotalAmount.ToString("N0") ₫</p>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-2">
-                                <small class="text-muted">Sản phẩm:</small>
-                                <div class="mt-1">
-                                    @foreach (var detail in order.OrderDetails.Take(2))
-                                    {
-                                        <div class="d-flex justify-content-between">
-                                            <span>@(detail.Product?.ProductName ?? "Sản phẩm không tồn tại") x @detail.Quantity</span>
-                                            <span>@((detail.UnitPrice * detail.Quantity).ToString("N0")) ₫</span>
-                                        </div>
-                                    }
-                                    @if (order.OrderDetails.Count > 2)
-                                    {
-                                        <small class="text-muted">và @(order.OrderDetails.Count - 2) sản phẩm khác...</small>
-                                    }
-                                </div>
-                            </div>
 
-                            <div class="d-flex justify-content-between">
-                                <a href="/Order/Details/@order.OrderId" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye"></i> Xem chi tiết
-                                </a>
-                                @if (order.Status == "Pending")
-                                {
-                                    <form action="/Order/Cancel/@order.OrderId" method="post" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" 
-                                                onclick="return confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')">
-                                            <i class="fas fa-times"></i> Hủy đơn
-                                        </button>
-                                    </form>
-                                }
-                                else if (order.Status == "Confirmed")
-                                {
-                                    <span class="text-success">
-                                        <i class="fas fa-check-circle"></i> Đơn hàng đã được xác nhận
-                                    </span>
-                                }
+                        <div class="mo-card__meta">
+                            <div class="mo-meta">
+                                <span class="mo-meta__label"><i class="far fa-clock me-1"></i>Ngày đặt</span>
+                                <span class="mo-meta__value">@(order.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "—")</span>
                             </div>
+                            <div class="mo-meta text-end">
+                                <span class="mo-meta__label">Tổng tiền</span>
+                                <span class="mo-meta__total">@order.TotalAmount.ToString("#,##0") ₫</span>
+                            </div>
+                        </div>
+
+                        <div class="mo-card__products">
+                            <div class="mo-products__title">
+                                <i class="fas fa-box-open me-1"></i>Sản phẩm (@itemCount)
+                            </div>
+                            @if (order.OrderDetails != null && order.OrderDetails.Any())
+                            {
+                                @foreach (var detail in order.OrderDetails.Take(3))
+                                {
+                                    <div class="mo-product-line">
+                                        <span class="mo-product-line__name">
+                                            @(detail.Product?.ProductName ?? "Sản phẩm không tồn tại")
+                                            <span class="mo-product-line__qty">×@detail.Quantity</span>
+                                        </span>
+                                        <span class="mo-product-line__price">@((detail.UnitPrice * detail.Quantity).ToString("#,##0")) ₫</span>
+                                    </div>
+                                }
+                                @if (order.OrderDetails.Count > 3)
+                                {
+                                    <div class="mo-product-more">và @(order.OrderDetails.Count - 3) sản phẩm khác…</div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="mo-product-more">Không có sản phẩm.</div>
+                            }
+                        </div>
+
+                        <div class="mo-card__foot">
+                            <a href="/Order/Details/@order.OrderId" class="btn btn-sm btn-outline-light">
+                                <i class="fas fa-eye me-1"></i> Xem chi tiết
+                            </a>
+                            @if (order.Status == "Pending")
+                            {
+                                <form action="/Order/Cancel/@order.OrderId" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')">
+                                        <i class="fas fa-times me-1"></i> Hủy đơn
+                                    </button>
+                                </form>
+                            }
+                            else if (order.Status == "Confirmed")
+                            {
+                                <span class="mo-confirmed"><i class="fas fa-check-circle me-1"></i>Đã được xác nhận</span>
+                            }
                         </div>
                     </div>
                 </div>
@@ -116,53 +118,150 @@
     }
     else
     {
-        <div class="text-center py-5">
-            <i class="fas fa-receipt fa-4x text-muted mb-4"></i>
-            <h4 class="text-muted">Chưa có đơn hàng nào</h4>
-            <p class="text-muted">Hãy đặt hàng để xem lịch sử mua sắm của bạn</p>
-            <a href="/" class="btn btn-primary btn-lg">
-                <i class="fas fa-shopping-bag"></i> Mua sắm ngay
+        <div class="text-center py-5 my-orders__empty">
+            <i class="fas fa-receipt fa-4x mb-4"></i>
+            <h4>Chưa có đơn hàng nào</h4>
+            <p>Hãy đặt hàng để xem lịch sử mua sắm của bạn</p>
+            <a href="/" class="btn btn-outline-light btn-lg mt-2">
+                <i class="fas fa-shopping-bag me-2"></i> Mua sắm ngay
             </a>
         </div>
     }
 </div>
 
 <style>
-/* Fix text color in order cards */
-.card-body {
-    color: #333 !important;
-}
+    .my-orders { color: var(--lux-white, #fff); }
 
-.card-body strong {
-    color: #333 !important;
-}
+    .my-orders h2 {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 300;
+        letter-spacing: 0.08em;
+    }
 
-.card-body p {
-    color: #666 !important;
-}
+    /* ===== Card đơn hàng ===== */
+    .mo-card {
+        background: var(--lux-surface, #111);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        border-radius: 6px;
+        padding: 1.25rem 1.4rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        transition: border-color 0.3s ease, transform 0.3s ease;
+    }
 
-.card-body h6 {
-    color: #333 !important;
-}
+    .mo-card:hover {
+        border-color: rgba(255,255,255,0.45);
+        transform: translateY(-3px);
+    }
 
-.card-body .text-muted {
-    color: #6c757d !important;
-}
+    .mo-card__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 0.9rem;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
 
-.card-body .text-success {
-    color: #28a745 !important;
-}
+    .mo-card__id {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        color: var(--lux-white, #fff);
+    }
 
-.card-body .text-warning {
-    color: #ffc107 !important;
-}
+    .mo-card__id span { color: var(--lux-muted, #b3b3b3); }
 
-.card-body .text-info {
-    color: #17a2b8 !important;
-}
+    /* Badge trạng thái */
+    .mo-badge {
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.4rem 0.8rem;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
 
-/* Fix alert text color */
-.alert {
-    color: #333 !important;
-}
+    .mo-badge--pending { background: rgba(255,193,7,0.15); color: #ffc94d; border: 1px solid rgba(255,193,7,0.5); }
+    .mo-badge--success { background: rgba(40,167,69,0.15); color: #5cd47a; border: 1px solid rgba(40,167,69,0.5); }
+    .mo-badge--info { background: rgba(23,162,184,0.15); color: #4fd0e3; border: 1px solid rgba(23,162,184,0.5); }
+    .mo-badge--primary { background: rgba(74,144,255,0.15); color: #7eacff; border: 1px solid rgba(74,144,255,0.5); }
+    .mo-badge--danger { background: rgba(220,53,69,0.15); color: #ff7b87; border: 1px solid rgba(220,53,69,0.5); }
+    .mo-badge--secondary { background: rgba(255,255,255,0.08); color: #b3b3b3; border: 1px solid rgba(255,255,255,0.25); }
+
+    /* Meta: ngày đặt + tổng tiền */
+    .mo-card__meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .mo-meta { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .mo-meta__label {
+        color: var(--lux-faint, #808080);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .mo-meta__value { color: var(--lux-white, #fff); font-size: 0.95rem; }
+
+    .mo-meta__total {
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 1.15rem;
+    }
+
+    /* Danh sách sản phẩm */
+    .mo-card__products { padding: 1rem 0; flex: 1 1 auto; }
+
+    .mo-products__title {
+        color: var(--lux-faint, #808080);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.6rem;
+    }
+
+    .mo-product-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.3rem 0;
+        color: var(--lux-muted, #b3b3b3);
+        font-size: 0.92rem;
+    }
+
+    .mo-product-line__name { color: #d9d9d9; }
+    .mo-product-line__qty { color: var(--lux-faint, #808080); margin-left: 0.25rem; }
+    .mo-product-line__price { color: var(--lux-white, #fff); white-space: nowrap; }
+
+    .mo-product-more {
+        color: var(--lux-faint, #808080);
+        font-size: 0.82rem;
+        font-style: italic;
+        margin-top: 0.35rem;
+    }
+
+    /* Footer hành động */
+    .mo-card__foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        padding-top: 0.9rem;
+        border-top: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .mo-confirmed { color: #5cd47a; font-size: 0.88rem; }
+
+    /* Empty state */
+    .my-orders__empty { color: var(--lux-muted, #b3b3b3); }
+    .my-orders__empty i { color: var(--lux-faint, #808080); }
+    .my-orders__empty h4 { color: var(--lux-white, #fff); font-weight: 300; letter-spacing: 0.06em; }
 </style>

@@ -1,13 +1,20 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="vi">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - ToyStore</title>
+
+    <!-- Google Fonts: Montserrat (tiêu đề sang trọng) + Inter (văn bản) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/layout.css?v=2" />
     <link rel="stylesheet" href="~/ToyStore.styles.css" asp-append-version="true" />
+    <!-- site.css nạp SAU cùng để theme Mecha HUD ghi đè Bootstrap + layout.css -->
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
@@ -73,6 +80,9 @@
                                         <li><a class="dropdown-item" asp-controller="Products" asp-action="Index"><i class="fas fa-box"></i> Sản phẩm</a></li>
                                         <li><a class="dropdown-item" asp-controller="Categories" asp-action="Index"><i class="fas fa-list"></i> Danh mục</a></li>
                                         <li><a class="dropdown-item" asp-controller="Orders" asp-action="Index"><i class="fas fa-clipboard-list"></i> Đơn hàng</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Promotions" asp-action="Index"><i class="fas fa-gift"></i> Quản lý Khuyến mãi</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Banners" asp-action="Index"><i class="fas fa-image"></i> Quản lý Banner</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Statistics" asp-action="Index"><i class="fas fa-chart-line"></i> Thống kê doanh thu</a></li>
                                     </ul>
                                 </li>
                             }
@@ -92,16 +102,19 @@
                             else if (Context.Session.GetString("UserType") == "Customer")
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Cart" asp-action="Index">
-                                        <i class="fas fa-shopping-cart"></i> Giỏ hàng
-                                    </a>
-                                </li>
-                                <li class="nav-item">
                                     <a class="nav-link" asp-controller="Order" asp-action="MyOrders">
                                         <i class="fas fa-receipt"></i> Đơn hàng của tôi
                                     </a>
                                 </li>
                             }
+                        }
+                        @if (Context.Session.GetString("UserType") != "Admin" && Context.Session.GetString("UserType") != "Staff")
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Cart" asp-action="Index">
+                                    <i class="fas fa-shopping-cart"></i> Giỏ hàng
+                                </a>
+                            </li>
                         }
                     </ul>
                     <ul class="navbar-nav">
@@ -195,10 +208,149 @@
             <p>&copy; 2025 - ToyStore - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a></p>
         </div>
     </footer>
+    <!-- ====== ToyStore Assistant - Floating Chat Widget ====== -->
+    <div id="toystore-chat">
+        <!-- Cửa sổ chat (mặc định ẩn) -->
+        <div id="chat-window" class="chat-window">
+            <div class="chat-header">
+                <div class="chat-header-info">
+                    <i class="fas fa-robot"></i>
+                    <div>
+                        <div class="chat-header-title">ToyStore Assistant</div>
+                        <div class="chat-header-status"><span class="status-dot"></span> Đang hoạt động</div>
+                    </div>
+                </div>
+                <button type="button" id="chat-close" class="chat-close" aria-label="Đóng">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="chat-messages" class="chat-messages">
+                <div class="chat-msg chat-msg-bot">
+                    <div class="chat-bubble">Xin chào! 👋 Tôi là <b>ToyStore Assistant</b>. Bạn cần tìm đồ chơi gì hay hỏi giá sản phẩm nào ạ?</div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Nhập câu hỏi của bạn..." autocomplete="off" />
+                <button type="button" id="chat-send" class="chat-send" aria-label="Gửi">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Nút tròn bật/tắt chat -->
+        <button type="button" id="chat-toggle" class="chat-toggle" aria-label="Mở chat tư vấn">
+            <i class="fas fa-comment-dots" id="chat-toggle-icon"></i>
+        </button>
+    </div>
+    <!-- ====== End Chat Widget ====== -->
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        (function () {
+            const toggleBtn = document.getElementById('chat-toggle');
+            const toggleIcon = document.getElementById('chat-toggle-icon');
+            const closeBtn = document.getElementById('chat-close');
+            const chatWindow = document.getElementById('chat-window');
+            const messagesEl = document.getElementById('chat-messages');
+            const inputEl = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send');
+
+            // Bật / tắt cửa sổ chat
+            function toggleChat() {
+                const isOpen = chatWindow.classList.toggle('open');
+                toggleIcon.className = isOpen ? 'fas fa-times' : 'fas fa-comment-dots';
+                if (isOpen) {
+                    inputEl.focus();
+                    scrollToBottom();
+                }
+            }
+
+            toggleBtn.addEventListener('click', toggleChat);
+            closeBtn.addEventListener('click', toggleChat);
+
+            // Tự cuộn xuống cuối khung chat
+            function scrollToBottom() {
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+
+            // Hiển thị 1 tin nhắn lên khung chat
+            function appendMessage(html, sender) {
+                const wrap = document.createElement('div');
+                wrap.className = 'chat-msg ' + (sender === 'user' ? 'chat-msg-user' : 'chat-msg-bot');
+
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble';
+                // Tin nhắn người dùng: hiển thị dạng text thuần; tin Bot: cho phép HTML từ server
+                if (sender === 'user') {
+                    bubble.textContent = html;
+                } else {
+                    bubble.innerHTML = html;
+                }
+
+                wrap.appendChild(bubble);
+                messagesEl.appendChild(wrap);
+                scrollToBottom();
+            }
+
+            // Hiệu ứng "Bot đang gõ..."
+            function showTyping() {
+                const typing = document.createElement('div');
+                typing.className = 'chat-msg chat-msg-bot';
+                typing.id = 'chat-typing';
+                typing.innerHTML =
+                    '<div class="chat-bubble chat-typing"><span></span><span></span><span></span></div>';
+                messagesEl.appendChild(typing);
+                scrollToBottom();
+            }
+
+            function removeTyping() {
+                const typing = document.getElementById('chat-typing');
+                if (typing) typing.remove();
+            }
+
+            // Gửi tin nhắn tới API
+            async function sendMessage() {
+                const text = inputEl.value.trim();
+                if (!text) return;
+
+                appendMessage(text, 'user');
+                inputEl.value = '';
+                inputEl.focus();
+
+                showTyping();
+
+                try {
+                    const res = await fetch('/Chat/SendMessage', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ Message: text })
+                    });
+
+                    const data = await res.json();
+                    removeTyping();
+                    appendMessage(data.response || 'Xin lỗi, đã có lỗi xảy ra.', 'bot');
+                } catch (err) {
+                    removeTyping();
+                    appendMessage('⚠️ Không thể kết nối tới máy chủ. Vui lòng thử lại sau!', 'bot');
+                }
+            }
+
+            sendBtn.addEventListener('click', sendMessage);
+            inputEl.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        })();
+    </script>
+
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

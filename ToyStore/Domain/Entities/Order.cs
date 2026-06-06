@@ -1,0 +1,40 @@
+using System;
+using System.Collections.Generic;
+
+namespace ToyStore.Domain.Entities;
+
+public partial class Order
+{
+    public int OrderId { get; set; }
+
+    public int CustomerId { get; set; }
+
+    public DateTime? OrderDate { get; set; }
+
+    public decimal TotalAmount { get; set; }
+
+    public string? Status { get; set; }
+
+    public string? PaymentMethod { get; set; }
+
+    public string? DeliveryMethod { get; set; }
+
+    /// <summary>
+    /// Tên discount strategy được áp dụng (VipDiscount, SeasonalDiscount, NoDiscount)
+    /// </summary>
+    public string? DiscountStrategyName { get; set; }
+
+    /// <summary>
+    /// Giá trị khuyến mãi (DiscountValue)
+    /// </summary>
+    public decimal DiscountValue { get; set; }
+
+    /// <summary>
+    /// Tổng tiền trước khi giảm giá: ∑(Quantity × UnitPrice)
+    /// </summary>
+    public decimal Subtotal { get; set; }
+
+    public virtual Customer Customer { get; set; } = null!;
+
+    public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
+}

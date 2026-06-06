@@ -1,123 +1,1129 @@
-﻿html {
-  font-size: 14px;
-}
-    
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+﻿/* =====================================================================
+   ToyStore - LUXURY CINEMATIC GALLERY THEME (Global UI)
+   Tối giản, sang trọng, đen/trắng/xám - nhường sự nổi bật cho hình ảnh.
+   Tất cả biến nằm trong :root để dễ tùy chỉnh.
+   File này nạp SAU cùng nên ghi đè được Bootstrap + layout.css cũ.
+   ===================================================================== */
+
+:root {
+    /* === Color Palette === */
+    --lux-bg: #0a0a0a;                 /* Nền thân trang - xám cực thẫm */
+    --lux-black: #000000;             /* Đen tuyệt đối */
+    --lux-surface: #111111;           /* Nền panel/section phụ */
+    --lux-surface-2: #161616;         /* Nền input/dropdown */
+
+    --lux-white: #ffffff;             /* Tiêu đề / nhấn mạnh */
+    --lux-text: #ffffff;
+    --lux-muted: #b3b3b3;             /* Mô tả / text phụ */
+    --lux-faint: #808080;             /* Text rất mờ */
+
+    --lux-line: rgba(255, 255, 255, 0.12);   /* Đường kẻ mảnh tối giản */
+    --lux-line-soft: rgba(255, 255, 255, 0.06);
+
+    /* === Shape === */
+    --lux-radius: 4px;                /* Bo góc cực nhẹ cho ảnh */
+
+    /* === Typography === */
+    --font-display: 'Montserrat', 'Segoe UI', sans-serif;  /* Tiêu đề / nav / button */
+    --font-body: 'Inter', 'Segoe UI', sans-serif;          /* Văn bản thường */
+
+    /* === Spacing scale === */
+    --space-sm: 1rem;
+    --space-md: 2rem;
+    --space-lg: 4rem;
+    --space-xl: 6rem;
+
+    /* === Motion === */
+    --lux-ease: 0.4s ease;
+    --lux-ease-slow: 0.6s ease;
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
+/* =====================================================================
+   1. BASE / TYPOGRAPHY
+   ===================================================================== */
 
 html {
-  position: relative;
-  min-height: 100%;
+    font-size: 15px;
+    position: relative;
+    min-height: 100%;
+}
+
+@media (min-width: 768px) {
+    html {
+        font-size: 16px;
+    }
 }
 
 body {
-  margin-bottom: 60px;
+    margin: 0;
+    background: var(--lux-bg) !important;
+    background-image: none !important;
+    color: var(--lux-text);
+    font-family: var(--font-body);
+    font-weight: 400;
+    line-height: 1.7;
+    letter-spacing: 0.2px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
+
+main {
+    flex: 1;
+}
+
+/* Tiêu đề: Montserrat, in hoa, tracking rộng, nét mảnh */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    color: var(--lux-white);
+    font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    line-height: 1.25;
+    margin-bottom: var(--space-sm);
+}
+
+h1 { font-size: 2.6rem; }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.5rem; }
+h4 { font-size: 1.2rem; letter-spacing: 0.14em; }
+h5 { font-size: 1rem; letter-spacing: 0.12em; }
+h6 { font-size: 0.85rem; letter-spacing: 0.12em; }
+
+/* Điểm nhấn nét đậm */
+strong, b, .fw-bold {
+    font-weight: 600 !important;
+}
+
+p {
+    color: var(--lux-muted);
+    font-weight: 400;
+    margin-bottom: var(--space-sm);
+}
+
+small, .text-muted {
+    color: var(--lux-muted) !important;
+}
+
+a {
+    color: var(--lux-white);
+    text-decoration: none;
+    transition: color var(--lux-ease);
+}
+
+a:hover {
+    color: var(--lux-muted);
+}
+
+hr {
+    border-color: var(--lux-line);
+    opacity: 1;
+}
+
+::selection {
+    background: var(--lux-white);
+    color: var(--lux-black);
+}
+
+/* =====================================================================
+   2. CARD - Product Card tối giản (transparent, no border)
+   ===================================================================== */
+
+.card {
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    color: var(--lux-text);
+    box-shadow: none !important;
+    text-align: center;
+}
+
+.card-body {
+    background-color: transparent;
+    color: var(--lux-text);
+    padding: 1.25rem 0.5rem;
+}
+
+.card-header,
+.card-footer {
+    background-color: transparent;
+    border: none;
+    color: var(--lux-white);
+    text-align: center;
+}
+
+.card-title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--lux-white);
+    font-size: 1rem;
+}
+
+.card-text,
+.card .price {
+    color: var(--lux-muted);
+    font-weight: 400;
+}
+
+/* Khung ảnh sản phẩm: bo góc nhẹ + che phần zoom */
+.card-img-top,
+.card .product-image,
+.product-card__image {
+    border-radius: var(--lux-radius);
+    overflow: hidden;
+    display: block;
+    width: 100%;
+    transition: transform var(--lux-ease-slow);
+}
+
+/* Wrapper bao quanh ảnh để cắt phần zoom tràn ra ngoài */
+.card-img-wrapper,
+.product-image-wrapper {
+    overflow: hidden;
+    border-radius: var(--lux-radius);
+    background-color: var(--lux-surface);
+}
+
+/* Hover: ảnh zoom nhẹ, mượt, chậm rãi */
+.card:hover .card-img-top,
+.card:hover .product-image,
+.card:hover .product-card__image,
+.card-img-wrapper:hover img,
+.product-image-wrapper:hover img {
+    transform: scale(1.03);
+}
+
+/* =====================================================================
+   3. BUTTONS - Ghost Button (viền mảnh, đảo màu khi hover)
+   ===================================================================== */
+
+.btn {
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.8rem;
+    background-color: transparent;
+    border: 1px solid var(--lux-white);
+    color: var(--lux-white);
+    border-radius: 0;
+    padding: 0.85rem 2.2rem;
+    transition: all var(--lux-ease);
+    box-shadow: none !important;
+}
+
+.btn:hover,
+.btn:focus {
+    background-color: var(--lux-white);
+    color: var(--lux-black);
+    border-color: var(--lux-white);
+}
+
+/* Mọi biến thể Bootstrap đều quy về Ghost trắng để giữ tối giản */
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-info,
+.btn-warning,
+.btn-danger,
+.btn-dark,
+.btn-light,
+.btn-outline-primary,
+.btn-outline-secondary,
+.btn-outline-light,
+.btn-outline-dark {
+    background-color: transparent;
+    border: 1px solid var(--lux-white);
+    color: var(--lux-white);
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-success:hover,
+.btn-info:hover,
+.btn-warning:hover,
+.btn-danger:hover,
+.btn-dark:hover,
+.btn-light:hover,
+.btn-outline-primary:hover,
+.btn-outline-secondary:hover,
+.btn-outline-light:hover,
+.btn-outline-dark:hover {
+    background-color: var(--lux-white);
+    color: var(--lux-black);
+    border-color: var(--lux-white);
+}
+
+/* Ghost mờ: dùng cho nút phụ (viền xám) */
+.btn-muted,
+.btn-link {
+    border: 1px solid var(--lux-line);
+    color: var(--lux-muted);
+    background: transparent;
+    text-decoration: none;
+}
+
+.btn-muted:hover,
+.btn-link:hover {
+    border-color: var(--lux-white);
+    color: var(--lux-white);
+    background: transparent;
+}
+
+.btn-sm {
+    padding: 0.55rem 1.4rem;
+    font-size: 0.72rem;
+}
+
+.btn-lg {
+    padding: 1.1rem 3rem;
+    font-size: 0.9rem;
+}
+
+/* =====================================================================
+   4. FORMS - tối giản, gạch chân thanh lịch
+   ===================================================================== */
+
+.form-control,
+.form-select,
+textarea {
+    background-color: transparent;
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    color: var(--lux-white);
+    padding: 0.75rem 1rem;
+    transition: border-color var(--lux-ease);
+}
+
+.form-control::placeholder,
+textarea::placeholder {
+    color: var(--lux-faint);
+}
+
+.form-control:focus,
+.form-select:focus,
+textarea:focus {
+    background-color: transparent;
+    border-color: var(--lux-white);
+    color: var(--lux-white);
+    box-shadow: none;
+}
+
+.form-label {
+    color: var(--lux-muted);
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.78rem;
+    margin-bottom: 0.5rem;
+}
+
+.input-group-text {
+    background-color: transparent;
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    color: var(--lux-muted);
+}
+
 .select2-container--open .select2-dropdown .select2-results__options {
-    max-height: 250px; /* Bạn có thể đổi thành 200px hoặc 300px tùy ý */
+    max-height: 250px;
     overflow-y: auto;
 }
 
-/* CRUD Neon/Dark Theme */
-.crud-theme .card {
-  background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border: 2px solid #00ff88;
-  border-radius: 1rem;
-  box-shadow: 0 0 30px rgba(0, 255, 136, 0.25), 0 0 60px rgba(0, 255, 136, 0.1);
+/* =====================================================================
+   5. TABLE / BADGE / MODAL / ALERT - tối giản
+   ===================================================================== */
+
+.table {
+    color: var(--lux-text);
+    border-color: var(--lux-line);
 }
 
-.crud-theme .card-header {
-  background: linear-gradient(135deg, #00ff88 0%, #00ffff 100%) !important;
-  color: #000 !important;
-  border-bottom: 0;
+.table > :not(caption) > * > * {
+    background-color: transparent;
+    color: var(--lux-text);
+    border-bottom-color: var(--lux-line-soft);
+    padding: 1rem 0.75rem;
 }
 
-.crud-theme .card-body {
-  background: #0f1223;
+.table thead th {
+    color: var(--lux-white);
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.78rem;
+    border-bottom: 1px solid var(--lux-line);
 }
 
-.crud-theme .form-label {
-  color: #b0b0ff;
-  font-weight: 600;
+.table-hover > tbody > tr:hover > * {
+    background-color: rgba(255, 255, 255, 0.03);
+    color: var(--lux-white);
 }
 
-.crud-theme .form-control,
-.crud-theme .form-select,
-.crud-theme textarea {
-  background-color: #242442;
-  border: 2px solid #00ff88;
-  color: #fff;
+.badge {
+    background-color: transparent !important;
+    border: 1px solid var(--lux-line);
+    color: var(--lux-muted) !important;
+    border-radius: 0;
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.4rem 0.7rem;
 }
 
-.crud-theme .form-control::placeholder,
-.crud-theme textarea::placeholder {
-  color: #8fa0ff;
+.modal-content {
+    background-color: var(--lux-bg);
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    color: var(--lux-text);
 }
 
-.crud-theme .form-control:focus,
-.crud-theme .form-select:focus,
-.crud-theme textarea:focus {
-  border-color: #00ff44;
-  box-shadow: 0 0 14px rgba(0, 255, 136, 0.35);
+.modal-header,
+.modal-footer {
+    border-color: var(--lux-line);
 }
 
-.crud-theme .btn-primary,
-.crud-theme .btn-success {
-  background: linear-gradient(135deg, #00ff88, #00ffff);
-  border: none;
-  color: #000;
-  font-weight: 700;
+.modal-title {
+    color: var(--lux-white);
 }
 
-.crud-theme .btn-warning {
-  background: linear-gradient(135deg, #ffd166, #fcbf49);
-  border: none;
-  color: #000;
-  font-weight: 700;
+.btn-close {
+    filter: invert(1) grayscale(1);
 }
 
-.crud-theme .btn-danger {
-  background: linear-gradient(135deg, #ff006e, #ff4d6d);
-  border: none;
-  color: #fff;
-  font-weight: 700;
+.alert {
+    background-color: var(--lux-surface);
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    color: var(--lux-text);
 }
 
-.crud-theme .btn-secondary {
-  background: #1f1f35;
-  border: 1px solid #39416b;
-  color: #b0b0ff;
+.alert-success,
+.alert-info {
+    border-left: 2px solid var(--lux-white);
 }
 
-.crud-theme .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(0, 255, 136, 0.25);
+.alert-danger,
+.alert-warning {
+    border-left: 2px solid var(--lux-muted);
 }
 
-.crud-theme .badge {
-  border: 1px solid rgba(255,255,255,0.15);
+/* =====================================================================
+   6. NAVBAR (ghi đè .custom-navbar của layout.css)
+   Trong suốt, phẳng, không viền, không đổ bóng.
+   ===================================================================== */
+
+.custom-navbar {
+    background: rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    padding: 1.25rem 0;
+    transition: background var(--lux-ease), padding var(--lux-ease);
 }
 
-.crud-theme .alert-warning {
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.25);
-  color: #ffd166;
+/* Trạng thái khi cuộn trang (thêm class .navbar-scrolled bằng JS nếu muốn) */
+.custom-navbar.navbar-scrolled {
+    background: rgba(0, 0, 0, 0.92) !important;
+    padding: 0.75rem 0;
 }
 
-.crud-theme dt {
-  color: #b0b0ff;
-}
-.crud-theme dd {
-  color: #e0e0ff;
+.brand-logo {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--lux-white) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--lux-white) !important;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: opacity var(--lux-ease);
 }
 
-.crud-theme h4, .crud-theme h3, .crud-theme h5, .crud-theme p, .crud-theme label, .crud-theme small {
-  color: #e0e0ff !important;
+.brand-logo:hover {
+    opacity: 0.7;
+    text-shadow: none;
+    transform: none;
+}
+
+.brand-logo i {
+    color: var(--lux-white);
+    font-size: 1.1rem;
+}
+
+/* Menu dàn trải đều, căn giữa */
+.navbar-nav.flex-grow-1 {
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.nav-link {
+    color: var(--lux-muted) !important;
+    font-family: var(--font-display);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.8rem;
+    transition: color var(--lux-ease);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1.1rem !important;
+    margin: 0;
+}
+
+.nav-link:hover {
+    color: var(--lux-white) !important;
+    text-shadow: none;
+}
+
+/* Bỏ gạch chân neon cũ */
+.nav-link::after {
+    display: none !important;
+}
+
+.navbar-toggler {
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+}
+
+.navbar-toggler:focus {
+    box-shadow: none;
+}
+
+/* Dropdown tối giản */
+.dropdown-menu-dark,
+.dropdown-menu {
+    background: var(--lux-black);
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.dropdown-menu-dark .dropdown-item,
+.dropdown-menu .dropdown-item {
+    color: var(--lux-muted);
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    transition: all var(--lux-ease);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+}
+
+.dropdown-menu-dark .dropdown-item:hover,
+.dropdown-menu .dropdown-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--lux-white);
+}
+
+.dropdown-divider {
+    border-color: var(--lux-line);
+    opacity: 1;
+}
+
+.dropdown-item-text,
+.user-type {
+    color: var(--lux-white) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--lux-white) !important;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+}
+
+.user-greeting {
+    background: transparent;
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    padding: 0.45rem 1rem !important;
+    transition: all var(--lux-ease);
+}
+
+.user-greeting:hover {
+    background: transparent;
+    border-color: var(--lux-white);
+    box-shadow: none;
+}
+
+/* Login / Register -> Ghost button */
+.btn-login,
+.btn-register {
+    padding: 0.5rem 1.3rem !important;
+    border-radius: 0;
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.78rem;
+    transition: all var(--lux-ease);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid var(--lux-white);
+    color: var(--lux-white) !important;
+}
+
+.btn-login:hover,
+.btn-register:hover {
+    background: var(--lux-white);
+    color: var(--lux-black) !important;
+    box-shadow: none;
+}
+
+/* =====================================================================
+   7. FOOTER (ghi đè .custom-footer của layout.css)
+   ===================================================================== */
+
+.custom-footer {
+    background: var(--lux-black) !important;
+    border: none !important;
+    border-top: 1px solid var(--lux-line) !important;
+    box-shadow: none !important;
+    padding: var(--space-lg) 0;
+    margin-top: var(--space-xl);
+    color: var(--lux-faint);
+}
+
+.custom-footer p {
+    margin: 0;
+    text-align: center;
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    font-size: 0.85rem;
+}
+
+.custom-footer a {
+    color: var(--lux-muted);
+}
+
+.custom-footer a:hover {
+    color: var(--lux-white);
+    text-shadow: none;
+}
+
+/* =====================================================================
+   8. HERO BANNER - Cinematic full screen
+   Chèn ảnh: .hero-banner { background-image: url('/images/...'); }
+   ===================================================================== */
+
+.hero-banner {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    /* background-image: url('/images/hero.jpg'); <-- chèn ảnh tối màu sau */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: var(--lux-black);
+    margin-bottom: var(--space-xl);
+    overflow: hidden;
+}
+
+/* Lớp phủ gradient từ dưới lên làm nổi chữ */
+.hero-banner::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.95) 0%,
+        rgba(0, 0, 0, 0.55) 45%,
+        rgba(0, 0, 0, 0.35) 100%
+    );
+    z-index: 1;
+}
+
+.hero-banner > .container,
+.hero-banner .hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 800px;
+    padding: 0 var(--space-sm);
+}
+
+.hero-banner h1,
+.hero-banner .hero-title__brand {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(2.5rem, 6vw, 5rem);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--lux-white);
+    margin-bottom: var(--space-sm);
+    text-shadow: none;
+}
+
+.hero-banner .hero-subtitle,
+.hero-banner p {
+    color: var(--lux-muted);
+    font-weight: 300;
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-md);
+}
+
+/* Mũi tên/indicator cuộn xuống (tùy chọn) */
+.hero-scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    color: var(--lux-muted);
+    font-size: 1.5rem;
+    animation: heroBounce 2s infinite;
+}
+
+@keyframes heroBounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(10px); }
+}
+
+/* =====================================================================
+   9. FEATURE CARD (ghi đè layout.css cho đồng bộ tối giản)
+   ===================================================================== */
+
+.feature-card {
+    background: transparent;
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    padding: var(--space-md) var(--space-sm);
+    text-align: center;
+    transition: border-color var(--lux-ease);
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.feature-card:hover {
+    border-color: var(--lux-white);
+    transform: none;
+    box-shadow: none;
+}
+
+.feature-card::before {
+    display: none !important;
+}
+
+.feature-icon {
+    font-size: 2.6rem;
+    margin-bottom: var(--space-sm);
+    color: var(--lux-white);
+    background: none;
+    -webkit-text-fill-color: var(--lux-white);
+    filter: none;
+    transition: opacity var(--lux-ease);
+}
+
+.feature-card:hover .feature-icon {
+    transform: none;
+    opacity: 0.7;
+    filter: none;
+}
+
+.feature-title {
+    color: var(--lux-white);
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    margin-bottom: 0.75rem;
+}
+
+.feature-card:hover .feature-title {
+    color: var(--lux-white);
+    text-shadow: none;
+}
+
+.feature-description {
+    color: var(--lux-muted);
+    font-size: 0.92rem;
+    font-weight: 400;
+    line-height: 1.7;
+    margin-bottom: var(--space-sm);
+}
+
+.feature-btn {
+    background: transparent;
+    color: var(--lux-white);
+    border: 1px solid var(--lux-white);
+    padding: 0.75rem 2rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.78rem;
+    border-radius: 0;
+    transition: all var(--lux-ease);
+    text-decoration: none;
+    display: inline-block;
+}
+
+.feature-btn::before {
+    display: none !important;
+}
+
+.feature-btn:hover {
+    background: var(--lux-white);
+    color: var(--lux-black);
+    transform: none;
+    box-shadow: none;
+}
+
+/* =====================================================================
+   10. SECTION TITLES & SPACING HELPERS
+   ===================================================================== */
+
+.section {
+    padding: var(--space-lg) 0;
+}
+
+.section-title {
+    text-align: center;
+    font-family: var(--font-display);
+    font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--lux-white);
+    margin-bottom: var(--space-md);
+}
+
+.section-subtitle {
+    text-align: center;
+    color: var(--lux-muted);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-lg);
+}
+
+/* Đường kẻ phân cách thanh lịch */
+.lux-divider {
+    width: 60px;
+    height: 1px;
+    background: var(--lux-white);
+    margin: var(--space-sm) auto;
+    border: none;
+    opacity: 0.6;
+}
+
+/* =====================================================================
+   11. SCROLLBAR
+   ===================================================================== */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--lux-black);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+/* =====================================================================
+   12. CHAT WIDGET (đồng bộ sang tối giản đen/trắng)
+   ===================================================================== */
+
+#toystore-chat {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1050;
+    font-family: var(--font-body);
+}
+
+.chat-toggle {
+    width: 58px;
+    height: 58px;
+    border-radius: 0;
+    border: 1px solid var(--lux-white);
+    background: var(--lux-black);
+    color: var(--lux-white);
+    font-size: 1.4rem;
+    cursor: pointer;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    transition: all var(--lux-ease);
+}
+
+.chat-toggle:hover {
+    background: var(--lux-white);
+    color: var(--lux-black);
+    transform: none;
+    box-shadow: none;
+}
+
+.chat-window {
+    display: none;
+    flex-direction: column;
+    width: 350px;
+    max-width: calc(100vw - 48px);
+    height: 480px;
+    max-height: calc(100vh - 130px);
+    background: var(--lux-bg);
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    box-shadow: none;
+    overflow: hidden;
+    margin-bottom: 14px;
+    transform: translateY(20px) scale(0.98);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.chat-window.open {
+    display: flex;
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.chat-header {
+    background: var(--lux-black);
+    color: var(--lux-white);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--lux-line);
+}
+
+.chat-header-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chat-header-info > i {
+    font-size: 1.4rem;
+}
+
+.chat-header-title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 0.95rem;
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.chat-header-status {
+    font-size: 0.72rem;
+    color: var(--lux-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: 0.04em;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lux-white);
+    display: inline-block;
+    box-shadow: none;
+}
+
+.chat-close {
+    background: transparent;
+    border: none;
+    color: var(--lux-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: color var(--lux-ease);
+}
+
+.chat-close:hover {
+    color: var(--lux-white);
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background: var(--lux-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-msg {
+    display: flex;
+    max-width: 85%;
+}
+
+.chat-msg-user {
+    align-self: flex-end;
+    justify-content: flex-end;
+}
+
+.chat-msg-bot {
+    align-self: flex-start;
+    justify-content: flex-start;
+}
+
+.chat-bubble {
+    padding: 10px 14px;
+    border-radius: 0;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    border: 1px solid var(--lux-line);
+}
+
+.chat-msg-bot .chat-bubble {
+    background: var(--lux-surface);
+    color: var(--lux-text);
+}
+
+.chat-msg-user .chat-bubble {
+    background: var(--lux-white);
+    color: var(--lux-black);
+    border-color: var(--lux-white);
+}
+
+.chat-bubble ul {
+    list-style: disc;
+    padding-left: 1.2rem;
+}
+
+.chat-typing {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.chat-typing span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lux-muted);
+    display: inline-block;
+    animation: chatBlink 1.4s infinite both;
+}
+
+.chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes chatBlink {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-3px); }
+}
+
+.chat-input-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--lux-black);
+    border-top: 1px solid var(--lux-line);
+}
+
+.chat-input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--lux-line);
+    border-radius: 0;
+    padding: 9px 14px;
+    font-size: 0.88rem;
+    color: var(--lux-white);
+    outline: none;
+    transition: border-color var(--lux-ease);
+}
+
+.chat-input::placeholder {
+    color: var(--lux-faint);
+}
+
+.chat-input:focus {
+    border-color: var(--lux-white);
+    box-shadow: none;
+}
+
+.chat-send {
+    width: 40px;
+    height: 40px;
+    border-radius: 0;
+    border: 1px solid var(--lux-white);
+    background: transparent;
+    color: var(--lux-white);
+    font-size: 0.9rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--lux-ease);
+}
+
+.chat-send:hover {
+    background: var(--lux-white);
+    color: var(--lux-black);
+}
+
+@media (max-width: 480px) {
+    .chat-window {
+        width: calc(100vw - 30px);
+        height: 70vh;
+    }
+}
+
+/* =====================================================================
+   13. CONTENT FADE-IN (chuyển cảnh mượt, tối giản)
+   ===================================================================== */
+
+main {
+    animation: contentFadeIn 0.6s ease;
+}
+
+@keyframes contentFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+/* Fix lỗi Dropdown Menu bị che khuất bởi các thành phần khác */
+header, .navbar {
+    position: relative;
+    z-index: 1040 !important; /* Đẩy navbar lên lớp rất cao */
+}
+
+.dropdown-menu {
+    z-index: 1050 !important; /* Đẩy menu thả xuống lên lớp cao nhất */
+    background-color: #0a0a0a; /* Đảm bảo màu nền menu tối hoàn toàn để che phần bên dưới */
+    border: 1px solid #333; /* Thêm viền mờ để phân biệt với nền trang */
+}
+
+/* Đảm bảo các thành phần bên dưới không tự động trồi lên */
+.form-control, .form-select, .table-responsive {
+    z-index: 1 !important;
 }

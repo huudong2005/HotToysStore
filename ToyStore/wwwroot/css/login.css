@@ -1,25 +1,48 @@
-﻿/* File: wwwroot/css/login.css */
+﻿/* File: wwwroot/css/login.css
+   LUXURY CINEMATIC GALLERY - màn hình đăng nhập (đồng bộ với site.css) */
 
-/* Sử dụng font chữ thân thiện, vui tươi hơn */
 body {
-    font-family: 'Nunito', sans-serif;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: #0a0a0a;
     min-height: 100vh;
-    color: #fff;
+    color: #ffffff;
+    letter-spacing: 0.2px;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Màu nền nhẹ nhàng cho cột hình ảnh */
+/* Cột hình ảnh: đen tuyệt đối + viền phân tách mảnh */
 .bg-light-toy {
-    background: linear-gradient(135deg, #0a0a0a, #1a1a2e);
+    background: #000000;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+}
+
+/* Lớp phủ cinematic tối dần từ dưới lên cho ảnh carousel */
+.bg-light-toy::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.1) 60%, rgba(0, 0, 0, 0.25) 100%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Tiêu đề kiểu sang trọng: Montserrat, in hoa, giãn chữ rộng */
+h1, .h3 {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 300 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #ffffff !important;
 }
 
 /* Định nghĩa màu sắc thương hiệu */
 :root {
-    --primary-color: #00ff88; /* Neon xanh lá */
-    --primary-hover-color: #00ff44;
-    --secondary-color: #ff006e; /* Neon hồng */
-    --success-color: #00ff88;
-    --input-focus-color: #00ff88;
+    --primary-color: #ffffff;
+    --primary-hover-color: #b3b3b3;
+    --secondary-color: #b3b3b3;
+    --success-color: #ffffff;
+    --input-focus-color: #ffffff;
 }
 
 /* Tùy chỉnh input group và form-floating */
@@ -33,59 +56,83 @@ body {
     }
 
 .input-group-text {
-    background: linear-gradient(135deg, #00ff88 0%, #00ffff 100%);
-    border: 2px solid #00ff88;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-right: none;
     padding: 0 1rem;
-    color: #000;
+    color: #ffffff;
     font-weight: 500;
     transition: all 0.3s ease;
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    box-shadow: none;
 }
 
 .input-group:focus-within .input-group-text {
-    background: linear-gradient(135deg, #00ffff 0%, #00ff88 100%);
-    border-color: #00ff44;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8), 0 0 30px rgba(0, 255, 136, 0.3);
+    background: transparent;
+    border-color: #ffffff;
+    box-shadow: none;
 }
 
 .form-control {
-    border: 2px solid #00ff88;
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-left: none;
     padding: 0.875rem 1rem;
     font-size: 0.95rem;
     transition: all 0.3s ease;
-    background-color: #1a1a2e;
-    color: #fff;
+    background-color: transparent;
+    color: #ffffff;
+    border-radius: 0;
 }
 
+    .form-control::placeholder {
+        color: #808080;
+    }
+
     .form-control:hover {
-        border-color: #00ffff;
-        background-color: #242442;
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.3);
+        background-color: transparent;
+        box-shadow: none;
     }
 
     .form-control:focus {
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.5), inset 0 0 10px rgba(0, 255, 136, 0.1);
-        border-color: #00ff44;
-        background-color: #242442;
-        color: #fff;
+        box-shadow: none;
+        border-color: #ffffff;
+        background-color: transparent;
+        color: #ffffff;
     }
 
 .form-floating > label {
-    color: #b0b0ff;
+    color: #808080;
     font-weight: 500;
     font-size: 0.9rem;
 }
 
 .form-control:focus ~ label,
 .form-control:not(:placeholder-shown) ~ label {
-    color: #00ff88;
+    color: #ffffff;
+}
+
+/* Bỏ dải nền trắng phía sau nhãn floating-label (lỗi trên nền tối) */
+.form-floating > label::after {
+    background-color: transparent !important;
+}
+
+.form-floating > label {
+    background: transparent !important;
+}
+
+/* Chống nền trắng khi trình duyệt tự điền (autofill) */
+.form-control:-webkit-autofill,
+.form-control:-webkit-autofill:hover,
+.form-control:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    transition: background-color 9999s ease-in-out 0s;
+    box-shadow: 0 0 0 1000px #0a0a0a inset !important;
 }
 
 /* Tùy chỉnh nhãn và các yếu tố khác */
 .form-check-label {
-    color: #e0e0ff;
+    color: #b3b3b3;
     font-weight: 500;
     cursor: pointer;
     user-select: none;
@@ -95,33 +142,42 @@ body {
     width: 1.25rem;
     height: 1.25rem;
     cursor: pointer;
-    border: 2px solid #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.3);
     transition: all 0.3s ease;
 }
 
     .form-check-input:hover {
-        border-color: #667eea;
+        border-color: #ffffff;
     }
 
     .form-check-input:checked {
         background-color: var(--primary-color);
         border-color: var(--primary-color);
+        /* Dấu tích màu đen để nhìn rõ trên nền trắng */
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3l6-6'/%3e%3c/svg%3e");
+    }
+
+    .form-check-input:focus {
+        border-color: #ffffff;
+        box-shadow: none;
     }
 
 /* Nút bấm nổi bật hơn */
 .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: none;
-    color: white;
+    background: transparent;
+    border: 1px solid #ffffff;
+    color: #ffffff;
     padding: 0.875rem 2rem;
     font-weight: 700;
     font-size: 1.05rem;
-    letter-spacing: 0.5px;
-    border-radius: 0.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Montserrat', sans-serif;
+    border-radius: 0;
+    transition: all 0.4s ease;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: none;
 }
 
     .btn-primary::before {
@@ -141,14 +197,14 @@ body {
     }
 
     .btn-primary:hover {
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        background: #ffffff;
+        color: #000;
+        border-color: #ffffff;
+        box-shadow: none;
     }
 
     .btn-primary:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        box-shadow: none;
     }
 
 /* Liên kết */
@@ -165,7 +221,7 @@ a.text-decoration-none {
         bottom: -2px;
         left: 0;
         width: 0;
-        height: 2px;
+        height: 1px;
         background-color: var(--primary-color);
         transition: width 0.3s ease;
     }
@@ -199,8 +255,8 @@ a.text-decoration-none {
 
 /* Alert */
 .alert {
-    border: none;
-    border-radius: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0;
     animation: alertSlideIn 0.4s ease;
 }
 
@@ -217,9 +273,11 @@ a.text-decoration-none {
 }
 
 .alert-success {
-    background-color: #d4edda;
-    color: #155724;
-    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.15);
+    background-color: #111111;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-left: 2px solid #ffffff;
+    color: #ffffff;
+    box-shadow: none;
 }
 
 /* Carousel animations */
@@ -273,22 +331,22 @@ a.text-decoration-none {
 
 /* Text headings và paragraphs */
 h1 {
-    color: #fff !important;
+    color: #ffffff !important;
 }
 
 .text-muted {
-    color: #b0b0ff !important;
+    color: #b3b3b3 !important;
 }
 
 p {
-    color: #e0e0ff !important;
+    color: #b3b3b3 !important;
 }
 
 /* Password toggle button styles */
 .password-toggle-btn {
-    border: 2px solid #00ff88;
-    background: linear-gradient(135deg, #1a1a2e, #24243e);
-    color: #00ff88;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: #b3b3b3;
     border-left: none;
     padding: 0.875rem 1rem;
     transition: all 0.3s ease;
@@ -297,10 +355,10 @@ p {
 }
 
 .password-toggle-btn:hover {
-    background: linear-gradient(135deg, #00ff88, #00ffff);
+    background: #ffffff;
     color: #000;
-    border-color: #00ffff;
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+    border-color: #ffffff;
+    box-shadow: none;
     transform: scale(1.05);
 }
 
@@ -309,7 +367,7 @@ p {
 }
 
 .password-toggle-btn:focus {
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+    box-shadow: none;
     outline: none;
 }
 
@@ -342,10 +400,10 @@ p {
 
 /* Input group focus effect for password fields */
 .input-group:focus-within .password-toggle-btn {
-    background: linear-gradient(135deg, #00ff88, #00ffff);
-    color: #000;
-    border-color: #00ff44;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+    background: transparent;
+    color: #ffffff;
+    border-color: #ffffff;
+    box-shadow: none;
 }
 
 /* Smooth transition for password visibility */
@@ -360,6 +418,6 @@ input[type="password"], input[type="text"] {
 
 @keyframes pulseEffect {
     0% { transform: scale(1); }
-    50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(0, 255, 136, 0.8); }
+    50% { transform: scale(1.1); box-shadow: none; }
     100% { transform: scale(1); }
 }

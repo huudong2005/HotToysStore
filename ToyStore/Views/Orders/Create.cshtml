@@ -1,4 +1,4 @@
-@model ToyStore.Models.Order
+@model ToyStore.Domain.Entities.Order
 
 @{
     ViewData["Title"] = "Create";
@@ -29,7 +29,13 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     <label asp-for="PaymentMethod" class="form-label"></label>
-                                    <input asp-for="PaymentMethod" class="form-control" />
+                                    <select asp-for="PaymentMethod" class="form-select">
+                                        <option value="">-- Chọn phương thức thanh toán --</option>
+                                        <option value="COD">COD (Thanh toán khi nhận hàng)</option>
+                                        <option value="BankTransfer">Chuyển khoản ngân hàng</option>
+                                        <option value="CreditCard">Thẻ tín dụng/Ghi nợ</option>
+                                        <option value="EWallet">Ví điện tử</option>
+                                    </select>
                                     <span asp-validation-for="PaymentMethod" class="text-danger"></span>
                                 </div>
                             </div>

@@ -1,7 +1,11 @@
-using ToyStore.Models;
+using ToyStore.Domain.Interfaces;
 
 namespace ToyStore.Middleware
 {
+    /// <summary>
+    /// Middleware để load UserSession vào HttpContext.Items
+    /// Tuân thủ Dependency Injection và SOLID principles
+    /// </summary>
     public class SessionMiddleware
     {
         private readonly RequestDelegate _next;
@@ -11,25 +15,14 @@ namespace ToyStore.Middleware
             _next = next;
         }
 
-        public async Task InvokeAsync(HttpContext context)
+        public async Task InvokeAsync(HttpContext context, ISessionService sessionService)
         {
-            // Lấy thông tin user từ session
-            var userId = context.Session.GetString("UserId");
-            var isAuthenticated = context.Session.GetString("IsAuthenticated");
+            // Resolve ISessionService từ HttpContext.RequestServices (scoped)
+            // Đây là cách đúng để sử dụng scoped services trong middleware
+            var userSession = sessionService.GetUserSession(context);
 
-            if (!string.IsNullOrEmpty(userId) && isAuthenticated == "True")
+            if (userSession != null)
             {
-                var userSession = new UserSession
-                {
-                    UserId = int.Parse(userId),
-                    Username = context.Session.GetString("Username") ?? "",
-                    Email = context.Session.GetString("Email") ?? "",
-                    FullName = context.Session.GetString("FullName") ?? "",
-                    UserType = context.Session.GetString("UserType") ?? "",
-                    Role = context.Session.GetString("Role") ?? "",
-                    IsAuthenticated = true
-                };
-
                 // Thêm user session vào HttpContext để sử dụng trong controllers
                 context.Items["UserSession"] = userSession;
             }

@@ -1,8 +1,12 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ToyStore.Models;
 using ToyStore.Helpers;
+using ToyStore.Domain.Entities;
+using ToyStore.Domain.Interfaces;
+using ToyStore.Infrastructure.Data;
 
 namespace ToyStore.Controllers
 {
@@ -10,112 +14,100 @@ namespace ToyStore.Controllers
     {
         private readonly ILogger<HomeController> _logger;
         private readonly ToyStoreContext _context;
+        private readonly ISessionService _sessionService;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public HomeController(ILogger<HomeController> logger, ToyStoreContext context)
+        public HomeController(
+            ILogger<HomeController> logger,
+            ToyStoreContext context,
+            ISessionService sessionService,
+            IUnitOfWork unitOfWork)
         {
             _logger = logger;
             _context = context;
+            _sessionService = sessionService;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<IActionResult> Index(string searchName)
         {
-            var user = AuthHelper.GetCurrentUser(HttpContext);
+            var user = _sessionService.GetUserSession(HttpContext);
             ViewBag.User = user;
-            
-            // Check if user just logged in
+
+            // Lấy danh sách banner đang kích hoạt cho Hero Carousel (không để lỗi DB làm sập trang)
+            try
+            {
+                ViewBag.ActiveBanners = await _unitOfWork.Banners.GetActiveBannersAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Không tải được banner trang chủ");
+                ViewBag.ActiveBanners = null;
+            }
+
             var showWelcomeToast = HttpContext.Session.GetString("ShowWelcomeToast");
             if (!string.IsNullOrEmpty(showWelcomeToast))
             {
                 HttpContext.Session.Remove("ShowWelcomeToast");
                 TempData["ShowWelcomeToast"] = "true";
             }
-            
+
+            // Sửa lỗi mapping bool? và tránh ORA-00904 bằng cách dùng == true
+            // Lưu ý: Phải có .HasConversion<int>() trong Context để Oracle hiểu == true là = 1
             var categoriesQuery = _context.Categories
                 .Include(c => c.Products.Where(p => p.Status == true))
                 .Where(c => c.Products.Any(p => p.Status == true))
                 .AsQueryable();
-            
-            // Filter products by name if search is provided
-            if (!string.IsNullOrEmpty(searchName))
-            {
-                categoriesQuery = categoriesQuery
-                    .Where(c => c.Products.Any(p => p.Status == true && p.ProductName.Contains(searchName)));
-            }
-            
+
             var categoriesWithProducts = await categoriesQuery
                 .OrderBy(c => c.CategoryName)
                 .ToListAsync();
-            
-            // Filter products within each category
+
             if (!string.IsNullOrEmpty(searchName))
             {
-                foreach (var category in categoriesWithProducts)
-                {
-                    category.Products = category.Products
-                        .Where(p => p.ProductName.Contains(searchName))
-                        .ToList();
-                }
+                await FilterCategoriesBySearchAsync(categoriesWithProducts, searchName);
             }
-            
+
             ViewBag.SearchName = searchName;
             return View(categoriesWithProducts);
         }
 
-        public IActionResult Privacy()
+        public async Task<IActionResult> Shop(string? keyword, int? categoryId, decimal? minPrice, decimal? maxPrice)
         {
-            return View();
-        }
+            var user = _sessionService.GetUserSession(HttpContext);
+            ViewBag.User = user;
 
-        public async Task<IActionResult> Shop(string searchName, int? categoryId)
-        {
-            var categoriesQuery = _context.Categories
-                .Include(c => c.Products.Where(p => p.Status == true))
-                .AsQueryable();
-            
-            // Filter by category if provided
-            if (categoryId.HasValue && categoryId.Value > 0)
+            // Gọi Stored Procedure để vừa Tìm kiếm vừa Lọc (danh mục + khoảng giá)
+            var products = (await _unitOfWork.Products.FilterProductsViaProcedureAsync(keyword, categoryId, minPrice, maxPrice))
+                .Where(p => p.Status == true)
+                .ToList();
+
+            // Lấy toàn bộ danh mục để dựng dropdown lọc
+            var allCategories = await _unitOfWork.Categories.GetAllAsync();
+            var orderedCategories = allCategories.OrderBy(c => c.CategoryName).ToList();
+
+            // Gán Category cho từng sản phẩm để hiển thị tên danh mục trên thẻ
+            var categoryLookup = orderedCategories.ToDictionary(c => c.CategoryId);
+            foreach (var product in products)
             {
-                categoriesQuery = categoriesQuery.Where(c => c.CategoryId == categoryId.Value);
-            }
-            
-            // Only include categories that have products
-            categoriesQuery = categoriesQuery.Where(c => c.Products.Any(p => p.Status == true));
-            
-            var categoriesWithProducts = await categoriesQuery
-                .OrderBy(c => c.CategoryName)
-                .ToListAsync();
-            
-            // Filter products by name if search is provided
-            if (!string.IsNullOrEmpty(searchName))
-            {
-                foreach (var category in categoriesWithProducts)
+                if (categoryLookup.TryGetValue(product.CategoryId, out var category))
                 {
-                    category.Products = category.Products
-                        .Where(p => p.ProductName.Contains(searchName))
-                        .ToList();
+                    product.Category = category;
                 }
-                
-                // Remove categories that have no matching products
-                categoriesWithProducts = categoriesWithProducts
-                    .Where(c => c.Products.Any())
-                    .ToList();
             }
-            
-            // Get all categories for filter dropdown
-            var allCategories = await _context.Categories
-                .Include(c => c.Products.Where(p => p.Status == true))
-                .Where(c => c.Products.Any(p => p.Status == true))
-                .OrderBy(c => c.CategoryName)
-                .ToListAsync();
-            
-            ViewBag.Categories = allCategories;
-            ViewBag.SearchName = searchName;
+
+            // Dropdown danh mục: tự đánh dấu option đang chọn theo categoryId hiện tại
+            ViewBag.Categories = new SelectList(orderedCategories, "CategoryId", "CategoryName", categoryId);
+
+            // Lưu lại trạng thái bộ lọc để bind lại vào Form trên UI
+            ViewBag.Keyword = keyword;
             ViewBag.CategoryId = categoryId;
-            
-            return View(categoriesWithProducts);
+            ViewBag.MinPrice = minPrice;
+            ViewBag.MaxPrice = maxPrice;
+
+            return View(products);
         }
 
-        // GET: Home/ProductDetails/5
         public async Task<IActionResult> ProductDetails(int id)
         {
             var product = await _context.Products
@@ -127,9 +119,9 @@ namespace ToyStore.Controllers
                 return NotFound();
             }
 
-            var user = AuthHelper.GetCurrentUser(HttpContext);
+            var user = _sessionService.GetUserSession(HttpContext);
             ViewBag.User = user;
-            
+
             return View(product);
         }
 
@@ -137,6 +129,32 @@ namespace ToyStore.Controllers
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+
+        private async Task FilterCategoriesBySearchAsync(ICollection<Category> categories, string keyword)
+        {
+            var matchedProductIds = (await _unitOfWork.Products.FilterProductsViaProcedureAsync(keyword, null, null, null))
+                .Where(p => p.Status == true)
+                .Select(p => p.ProductId)
+                .ToHashSet();
+
+            var categoriesToRemove = new List<Category>();
+            foreach (var category in categories)
+            {
+                category.Products = category.Products
+                    .Where(p => matchedProductIds.Contains(p.ProductId))
+                    .ToList();
+
+                if (!category.Products.Any())
+                {
+                    categoriesToRemove.Add(category);
+                }
+            }
+
+            foreach (var category in categoriesToRemove)
+            {
+                categories.Remove(category);
+            }
         }
     }
 }

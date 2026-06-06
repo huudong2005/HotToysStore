@@ -1,0 +1,96 @@
+@model ToyStore.Domain.Entities.Order
+
+@{
+    ViewData["Title"] = "Xác nhận đơn hàng";
+    var isLoggedInCustomer = Context.Session.GetString("IsAuthenticated") == "True"
+        && Context.Session.GetString("UserType") == "Customer";
+}
+
+<div class="container crud-theme py-4">
+    <div class="alert alert-success mb-4" role="alert">
+        <h4 class="alert-heading mb-2">
+            <i class="fas fa-check-circle me-2"></i>Đặt hàng thành công!
+        </h4>
+        <p class="mb-0">Cảm ơn bạn đã mua sắm tại ToyStore. Mã đơn hàng của bạn là <strong>#@Model.OrderId</strong>.</p>
+        @if (!isLoggedInCustomer)
+        {
+            <hr />
+            <p class="mb-0 small">
+                Bạn đang mua với tư cách <strong>khách vãng lai</strong>. Hãy lưu mã đơn hàng để tra cứu.
+                Muốn theo dõi đơn dễ hơn? <a asp-controller="Auth" asp-action="Register" class="alert-link">Đăng ký tài khoản</a>.
+            </p>
+        }
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0 text-dark">Chi tiết đơn hàng #@Model.OrderId</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Ngày đặt:</strong> @(Model.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "—")</p>
+                    <p>
+                        <strong>Trạng thái:</strong>
+                        <span class="badge bg-success ms-1">@(Model.Status switch {
+                            "Pending" => "Chờ xác nhận",
+                            "Confirmed" => "Đã xác nhận",
+                            _ => Model.Status
+                        })</span>
+                    </p>
+                    <p><strong>Tổng tiền:</strong> <span class="text-success fw-bold">@Model.TotalAmount.ToString("N0") ₫</span></p>
+                    <p><strong>Thanh toán:</strong> @(Model.PaymentMethod switch {
+                        "COD" => "Thanh toán khi nhận hàng",
+                        "VNPAY" => "VNPAY",
+                        "BankTransfer" => "Chuyển khoản",
+                        _ => Model.PaymentMethod
+                    })</p>
+
+                    <hr />
+                    <h6>Sản phẩm</h6>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var detail in Model.OrderDetails)
+                        {
+                            <li class="mb-2">
+                                @(detail.Product?.ProductName ?? "Sản phẩm") × @detail.Quantity
+                                — @((detail.UnitPrice * detail.Quantity).ToString("N0")) ₫
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0 text-dark">Giao hàng tới</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1">@(Model.Customer?.FullName)</p>
+                    <p class="mb-1">@(Model.Customer?.Phone)</p>
+                    <p class="mb-1">@(Model.Customer?.Address)</p>
+                    <p class="mb-0 text-muted small">@(Model.Customer?.Email)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        <a asp-controller="Home" asp-action="Shop" class="btn btn-success">
+            <i class="fas fa-store me-1"></i> Tiếp tục mua sắm
+        </a>
+        @if (isLoggedInCustomer)
+        {
+            <a asp-controller="Order" asp-action="MyOrders" class="btn btn-secondary">
+                <i class="fas fa-list me-1"></i> Đơn hàng của tôi
+            </a>
+        }
+        else
+        {
+            <a asp-controller="Auth" asp-action="Register" class="btn btn-outline-primary">
+                <i class="fas fa-user-plus me-1"></i> Tạo tài khoản
+            </a>
+        }
+    </div>
+</div>

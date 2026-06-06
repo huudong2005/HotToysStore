@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using ToyStore.Models;
 using System.Security.Cryptography;
 using System.Text;
+using ToyStore.Domain.Entities;
+using ToyStore.Domain.Interfaces;
+using ToyStore.Infrastructure.Data;
+using ToyStore.Infrastructure.Repositories;
+using ToyStore.Models;
 
 namespace ToyStore.Services
 {
@@ -19,10 +23,15 @@ namespace ToyStore.Services
     public class AuthService : IAuthService
     {
         private readonly ToyStoreContext _context;
+        private readonly IUserFactory _userFactory;
+        private readonly IAdminRepository _adminRepository;
 
-        public AuthService(ToyStoreContext context)
+        // Sửa Constructor để nhận thêm IAdminRepository
+        public AuthService(ToyStoreContext context, IUserFactory userFactory, IAdminRepository adminRepository)
         {
             _context = context;
+            _userFactory = userFactory;
+            _adminRepository = adminRepository; // Gán giá trị ở Bước 2
         }
 
         public async Task<UserSession?> LoginAsync(string emailOrUsername, string password, string userType)
@@ -44,8 +53,21 @@ namespace ToyStore.Services
             var customer = await _context.Customers
                 .FirstOrDefaultAsync(c => c.Email == emailOrUsername);
 
-            if (customer == null || !VerifyPassword(password, customer.PasswordHash))
+            if (customer == null)
                 return null;
+
+            // Hỗ trợ tương thích dữ liệu cũ: nếu từng lưu mật khẩu plain text thì cho đăng nhập 1 lần
+            // và tự động nâng cấp thành SHA256 hash.
+            if (!VerifyPassword(password, customer.PasswordHash))
+            {
+                if (customer.PasswordHash != password)
+                {
+                    return null;
+                }
+
+                customer.PasswordHash = HashPassword(password);
+                await _context.SaveChangesAsync();
+            }
 
             return new UserSession
             {
@@ -89,21 +111,27 @@ namespace ToyStore.Services
             return false;
         }
 
+        // Sửa lại hàm này trong file AuthService.cs của bạn
         public async Task<bool> CreateStaffAsync(CreateStaffViewModel model)
         {
             if (await IsUsernameExistsAsync(model.Username))
                 return false;
 
-            var admin = new Admin
-            {
-                Username = model.Username,
-                PasswordHash = HashPassword(model.Password),
-                FullName = model.FullName,
-                Role = model.Role
-            };
+            var passwordHash = HashPassword(model.Password);
+            Admin admin;
 
-            _context.Admins.Add(admin);
-            await _context.SaveChangesAsync();
+            if (model.Role?.ToLower() == "admin")
+            {
+                admin = _userFactory.CreateAdmin(model, passwordHash);
+            }
+            else
+            {
+                admin = _userFactory.CreateStaff(model, passwordHash);
+            }
+
+            // GỌI QUA REPOSITORY ĐỂ ĐẨY XUỐNG ORACLE PROCEDURE
+            // (Cần tiêm private readonly IAdminRepository _adminRepository vào Constructor của AuthService nhé)
+            await _adminRepository.CreateStaffViaProcedureAsync(admin);
             return true;
         }
 
@@ -112,15 +140,9 @@ namespace ToyStore.Services
             if (await IsEmailExistsAsync(model.Email))
                 return false;
 
-            var customer = new Customer
-            {
-                FullName = model.FullName,
-                Email = model.Email,
-                PasswordHash = HashPassword(model.Password),
-                Phone = model.Phone,
-                Address = model.Address,
-                CreatedAt = DateTime.Now
-            };
+            // Sử dụng UserFactory để tạo Customer với Role/Claims mặc định
+            var passwordHash = HashPassword(model.Password);
+            var customer = _userFactory.CreateCustomer(model, passwordHash);
 
             _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
@@ -132,13 +154,19 @@ namespace ToyStore.Services
             if (await IsUsernameExistsAsync(model.Email)) // Staff sử dụng email làm username
                 return false;
 
-            var admin = new Admin
-            {
-                Username = model.Email,
-                PasswordHash = HashPassword(model.Password),
-                FullName = model.FullName,
-                Role = "Staff"
-            };
+            // Sử dụng UserFactory để tạo Staff
+            var passwordHash = HashPassword(model.Password);
+            var admin = _userFactory.CreateStaff(
+                new CreateStaffViewModel
+                {
+                    Username = model.Email,
+                    FullName = model.FullName,
+                    Password = model.Password,
+                    ConfirmPassword = model.Password,
+                    Role = "Staff"
+                },
+                passwordHash
+            );
 
             _context.Admins.Add(admin);
             await _context.SaveChangesAsync();
@@ -147,12 +175,16 @@ namespace ToyStore.Services
 
         public async Task<bool> IsEmailExistsAsync(string email)
         {
-            return await _context.Customers.AnyAsync(c => c.Email == email);
+            // Thay vì dùng AnyAsync, ta dùng FirstOrDefaultAsync để tránh lỗi TRUE/FALSE của Oracle
+            var customer = await _context.Customers.FirstOrDefaultAsync(c => c.Email == email);
+            return customer != null;
         }
 
         public async Task<bool> IsUsernameExistsAsync(string username)
         {
-            return await _context.Admins.AnyAsync(a => a.Username == username);
+            // Thay vì dùng AnyAsync, ta dùng FirstOrDefaultAsync để tránh lỗi TRUE/FALSE của Oracle
+            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.Username == username);
+            return admin != null;
         }
 
         public string HashPassword(string password)

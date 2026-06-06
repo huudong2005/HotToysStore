@@ -1,0 +1,124 @@
+@model IEnumerable<ToyStore.Domain.Entities.Promotion>
+
+@{
+    ViewData["Title"] = "Quản lý khuyến mãi";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-ticket-alt me-2"></i> Quản lý khuyến mãi</h2>
+    <div class="d-flex align-items-center gap-3">
+        <form asp-action="Index" method="get" class="d-flex align-items-center">
+            <input type="text" name="searchString" value="@ViewData["CurrentFilter"]"
+                   class="form-control me-2" placeholder="Tìm theo mã / tên..." />
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="fas fa-search"></i>
+            </button>
+        </form>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i> Thêm khuyến mãi
+        </a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>@TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        @if (Model.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Mã code</th>
+                            <th>Tên chương trình</th>
+                            <th>Giảm giá</th>
+                            <th>Đơn tối thiểu</th>
+                            <th>Hiệu lực</th>
+                            <th>Lượt dùng</th>
+                            <th>Trạng thái</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td><span class="badge bg-primary">#@item.PromotionId</span></td>
+                                <td><code>@item.PromotionCode</code></td>
+                                <td>@item.PromotionName</td>
+                                <td>
+                                    @if (item.DiscountType == "Percentage")
+                                    {
+                                        <span class="badge bg-info text-dark">@item.DiscountValue.ToString("0.##")%</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success">@item.DiscountValue.ToString("#,##0") ₫</span>
+                                    }
+                                </td>
+                                <td>@item.MinOrderValue.ToString("#,##0") ₫</td>
+                                <td>
+                                    <small>
+                                        @item.StartDate.ToString("dd/MM/yyyy HH:mm")<br />
+                                        @item.EndDate.ToString("dd/MM/yyyy HH:mm")
+                                    </small>
+                                </td>
+                                <td>@item.UsedCount / @item.UsageLimit</td>
+                                <td>
+                                    @if (item.IsActive)
+                                    {
+                                        <span class="badge bg-success">Đang bật</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Đã tắt</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group" role="group">
+                                        <a asp-action="Edit" asp-route-id="@item.PromotionId" class="btn btn-sm btn-warning" title="Sửa">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form asp-action="Delete" asp-route-id="@item.PromotionId" method="post"
+                                              class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa mã khuyến mãi này?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Xóa">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="text-center py-5">
+                <i class="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
+                <h5>Chưa có mã khuyến mãi nào</h5>
+                <a asp-action="Create" class="btn btn-primary mt-2">
+                    <i class="fas fa-plus me-2"></i>Thêm khuyến mãi đầu tiên
+                </a>
+            </div>
+        }
+    </div>
+</div>

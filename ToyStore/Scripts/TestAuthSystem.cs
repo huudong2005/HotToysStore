@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ToyStore.Models;
 using ToyStore.Services;
+using ToyStore.Infrastructure.Data;
 
 namespace ToyStore.Scripts
 {

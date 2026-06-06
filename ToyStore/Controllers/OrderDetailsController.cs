@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ToyStore.Models;
+using ToyStore.Domain.Entities;
+using ToyStore.Infrastructure.Data;
 
 namespace ToyStore.Controllers
 {

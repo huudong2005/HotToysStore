@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ToyStore.Models;
 using ToyStore.Services;
+using ToyStore.Domain.Interfaces;
 using System.Diagnostics;
 
 namespace ToyStore.Controllers
@@ -8,18 +9,26 @@ namespace ToyStore.Controllers
     public class AuthController : Controller
     {
         private readonly IAuthService _authService;
+        private readonly ISessionService _sessionService;
+        private readonly ICartStorageService _cartStorage;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(
+            IAuthService authService,
+            ISessionService sessionService,
+            ICartStorageService cartStorage,
+            ILogger<AuthController> logger)
         {
             _authService = authService;
+            _sessionService = sessionService;
+            _cartStorage = cartStorage;
             _logger = logger;
         }
 
         [HttpGet]
         public IActionResult Login()
         {
-            if (HttpContext.Session.GetString("UserId") != null)
+            if (_sessionService.IsAuthenticated(HttpContext))
             {
                 return RedirectToAction("Index", "Home");
             }
@@ -55,17 +64,12 @@ namespace ToyStore.Controllers
                     return View(model);
                 }
 
-                // Lưu thông tin user vào session
-                HttpContext.Session.SetString("UserId", userSession.UserId.ToString());
-                HttpContext.Session.SetString("Username", userSession.Username);
-                HttpContext.Session.SetString("Email", userSession.Email);
-                HttpContext.Session.SetString("FullName", userSession.FullName);
-                HttpContext.Session.SetString("UserType", userSession.UserType);
-                HttpContext.Session.SetString("Role", userSession.Role);
-                HttpContext.Session.SetString("IsAuthenticated", userSession.IsAuthenticated.ToString());
-                
-                // Set flag to show welcome toast after login
-                HttpContext.Session.SetString("ShowWelcomeToast", "true");
+                _sessionService.SetUserSession(HttpContext, userSession);
+
+                if (userSession.UserType == "Customer")
+                {
+                    await _cartStorage.RestoreCartAfterLoginAsync(HttpContext, userSession.UserId);
+                }
 
                 _logger.LogInformation($"User {userSession.Username} logged in successfully");
 
@@ -89,7 +93,7 @@ namespace ToyStore.Controllers
         [HttpGet]
         public IActionResult Register()
         {
-            if (HttpContext.Session.GetString("UserId") != null)
+            if (_sessionService.IsAuthenticated(HttpContext))
             {
                 return RedirectToAction("Index", "Home");
             }
@@ -135,9 +139,18 @@ namespace ToyStore.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Logout()
+        public async Task<IActionResult> Logout()
         {
-            HttpContext.Session.Clear();
+            if (_sessionService.IsCustomer(HttpContext))
+            {
+                var customerId = _sessionService.GetUserId(HttpContext);
+                if (customerId > 0)
+                {
+                    await _cartStorage.PersistCartBeforeLogoutAsync(HttpContext, customerId);
+                }
+            }
+
+            _sessionService.ClearSession(HttpContext);
             TempData["SuccessMessage"] = "Đăng xuất thành công";
             return RedirectToAction("Index", "Home");
         }

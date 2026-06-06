@@ -2,10 +2,21 @@
 
 /* Nền trang */
 body {
-    font-family: 'Nunito', sans-serif;
-    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: #0a0a0a;
     min-height: 100vh;
-    color: #fff;
+    color: #ffffff;
+    letter-spacing: 0.2px;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Tiêu đề kiểu sang trọng: Montserrat, in hoa, giãn chữ rộng */
+h1, .h3 {
+    font-family: 'Montserrat', sans-serif !important;
+    font-weight: 300 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #ffffff !important;
 }
 
 /* Container */
@@ -13,99 +24,140 @@ body {
     padding: 2rem 0;
 }
 
+/* ===== Cột hình ảnh + Carousel (đồng bộ với màn hình đăng nhập) ===== */
+.bg-light-toy {
+    background: #000000;
+    height: 100vh;
+    overflow: hidden;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+}
+
+/* Lớp phủ cinematic tối dần */
+.bg-light-toy::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.1) 60%, rgba(0, 0, 0, 0.25) 100%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Carousel chiếm trọn cột để hiệu ứng fade hoạt động đúng */
+#registerCarousel,
+#registerCarousel .carousel-inner,
+#registerCarousel .carousel-item {
+    width: 100%;
+    height: 100%;
+}
+
+#registerCarousel .carousel-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
 /* Card */
 .card {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    border: 2px solid #00ff88;
-    border-radius: 1rem;
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.3), 0 0 60px rgba(0, 255, 136, 0.1);
+    background: #111111;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0;
+    box-shadow: none;
     overflow: hidden;
     transition: all 0.3s ease;
 }
 
     .card:hover {
-        box-shadow: 0 0 40px rgba(0, 255, 136, 0.5), 0 0 80px rgba(0, 255, 136, 0.2);
+        box-shadow: none;
     }
 
 /* Card Header */
 .card-header {
-    background: linear-gradient(135deg, #00ff88 0%, #00ffff 100%) !important;
-    color: #000 !important;
+    background: transparent !important;
+    color: #ffffff !important;
     padding: 1.5rem;
     font-weight: 700;
-    letter-spacing: 0.5px;
-    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Montserrat', sans-serif;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: none;
 }
 
     .card-header h4 {
-        color: #000;
+        color: #ffffff;
         margin: 0;
         font-size: 1.5rem;
     }
 
 /* Card Body */
 .card-body {
-    background: #1a1a2e;
+    background: #111111;
     padding: 2rem;
 }
 
 /* Form Label */
 .form-label {
-    color: #b0b0ff;
+    color: #b3b3b3;
     font-weight: 600;
     margin-bottom: 0.5rem;
     transition: all 0.3s ease;
+    font-family: 'Montserrat', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.78rem;
 }
 
 /* Form Control */
 .form-control {
-    background-color: #242442;
-    border: 2px solid #00ff88;
-    color: #fff;
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ffffff;
     padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    border-radius: 0;
     transition: all 0.3s ease;
     font-weight: 500;
 }
 
     .form-control::placeholder {
-        color: #888;
+        color: #808080;
     }
 
     .form-control:hover {
-        border-color: #00ffff;
-        background-color: #2a2a4a;
-        box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.3);
+        background-color: transparent;
+        box-shadow: none;
     }
 
     .form-control:focus {
-        border-color: #00ff44;
-        background-color: #2a2a4a;
-        color: #fff;
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.5), inset 0 0 10px rgba(0, 255, 136, 0.1);
+        border-color: #ffffff;
+        background-color: transparent;
+        color: #ffffff;
+        box-shadow: none;
         outline: none;
     }
 
     .form-control:read-only {
-        background-color: #1a1a2e;
-        border-color: #555;
-        color: #888;
+        background-color: transparent;
+        border-color: rgba(255, 255, 255, 0.06);
+        color: #808080;
         cursor: not-allowed;
     }
 
 /* Form Text / Small */
 .form-text {
-    color: #888 !important;
+    color: #808080 !important;
     font-size: 0.85rem;
 }
 
 .small {
-    color: #888;
+    color: #808080;
 }
 
 /* Validation Summary */
 .text-danger {
-    color: #ff006e !important;
+    color: #b3b3b3 !important;
     font-weight: 500;
     animation: slideIn 0.3s ease;
 }
@@ -115,23 +167,25 @@ span[class*="text-danger"] {
     display: block;
     margin-top: 0.25rem;
     font-size: 0.85rem;
-    color: #ff006e;
+    color: #b3b3b3;
 }
 
 /* Button */
 .btn-success {
-    background: linear-gradient(135deg, #00ff88 0%, #00ffff 100%);
-    border: none;
-    color: #000;
+    background: transparent;
+    border: 1px solid #ffffff;
+    color: #ffffff;
     padding: 0.875rem 2rem;
     font-weight: 700;
     font-size: 1.05rem;
-    letter-spacing: 0.5px;
-    border-radius: 0.5rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Montserrat', sans-serif;
+    border-radius: 0;
+    transition: all 0.4s ease;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
+    box-shadow: none;
     cursor: pointer;
 }
 
@@ -142,7 +196,7 @@ span[class*="text-danger"] {
         left: -100%;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.2);
         transition: left 0.3s ease;
         z-index: 1;
     }
@@ -152,23 +206,23 @@ span[class*="text-danger"] {
     }
 
     .btn-success:hover {
-        background: linear-gradient(135deg, #00ffff 0%, #00ff88 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 255, 136, 0.5);
+        background: #ffffff;
+        color: #000;
+        border-color: #ffffff;
+        box-shadow: none;
     }
 
     .btn-success:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 8px rgba(0, 255, 136, 0.3);
+        box-shadow: none;
     }
 
 /* Paragraph và Links */
 p {
-    color: #e0e0ff;
+    color: #b3b3b3;
 }
 
 a {
-    color: #00ff88;
+    color: #ffffff;
     text-decoration: none;
     font-weight: 600;
     transition: all 0.3s ease;
@@ -181,8 +235,8 @@ a {
         bottom: -2px;
         left: 0;
         width: 0;
-        height: 2px;
-        background-color: #00ff88;
+        height: 1px;
+        background-color: #ffffff;
         transition: width 0.3s ease;
     }
 
@@ -191,7 +245,7 @@ a {
     }
 
     a:hover {
-        color: #00ffff;
+        color: #b3b3b3;
     }
 
 /* Animation */
@@ -255,9 +309,9 @@ form {
 
 /* Password toggle button styles */
 .password-toggle-btn {
-    border: 2px solid #00ff88;
-    background: linear-gradient(135deg, #1a1a2e, #24243e);
-    color: #00ff88;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: #b3b3b3;
     border-left: none;
     padding: 0.75rem 1rem;
     transition: all 0.3s ease;
@@ -266,10 +320,10 @@ form {
 }
 
 .password-toggle-btn:hover {
-    background: linear-gradient(135deg, #00ff88, #00ffff);
+    background: #ffffff;
     color: #000;
-    border-color: #00ffff;
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+    border-color: #ffffff;
+    box-shadow: none;
     transform: scale(1.05);
 }
 
@@ -278,7 +332,7 @@ form {
 }
 
 .password-toggle-btn:focus {
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+    box-shadow: none;
     outline: none;
 }
 
@@ -311,10 +365,10 @@ form {
 
 /* Input group focus effect for password fields */
 .input-group:focus-within .password-toggle-btn {
-    background: linear-gradient(135deg, #00ff88, #00ffff);
-    color: #000;
-    border-color: #00ff44;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+    background: transparent;
+    color: #ffffff;
+    border-color: #ffffff;
+    box-shadow: none;
 }
 
 /* Smooth transition for password visibility */
@@ -329,6 +383,6 @@ input[type="password"], input[type="text"] {
 
 @keyframes pulseEffect {
     0% { transform: scale(1); }
-    50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(0, 255, 136, 0.8); }
+    50% { transform: scale(1.1); box-shadow: none; }
     100% { transform: scale(1); }
 }

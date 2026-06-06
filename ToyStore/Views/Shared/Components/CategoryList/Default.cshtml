@@ -1,0 +1,25 @@
+@model IEnumerable<ToyStore.Domain.Entities.Category>
+
+<section class="category-list">
+    <h3 class="h5 mb-3 category-list__title">Danh mục phổ biến</h3>
+    @if (Model == null || !Model.Any())
+    {
+        <div class="category-list__empty">
+            <i class="fas fa-inbox category-list__empty-icon"></i>
+            <p class="category-list__empty-text">Chưa có danh mục nào</p>
+        </div>
+    }
+    else
+    {
+        <ul class="list-group list-group-flush category-list__items">
+            @foreach (var category in Model)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center category-list__item">
+                    <span class="category-list__name">@category.CategoryName</span>
+                    <span class="badge category-list__badge">@(category.Products?.Count ?? 0)</span>
+                </li>
+            }
+        </ul>
+    }
+</section>
+

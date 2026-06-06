@@ -1,61 +1,290 @@
-@model ToyStore.Models.Order
+@model ToyStore.Domain.Entities.Order
 
 @{
-    ViewData["Title"] = "Details";
+    ViewData["Title"] = "Chi tiết đơn hàng";
+
+    (string label, string css) StatusBadge(string? status) => (status ?? "").ToLower() switch
+    {
+        "pending" => ("Chờ xử lý", "bg-warning text-dark"),
+        "confirmed" => ("Đã xác nhận", "bg-info text-dark"),
+        "processing" => ("Đang xử lý", "bg-info text-dark"),
+        "shipping" or "shipped" => ("Đang giao", "bg-primary"),
+        "completed" or "delivered" => ("Hoàn thành", "bg-success"),
+        "cancelled" or "canceled" => ("Đã hủy", "bg-danger"),
+        _ => (string.IsNullOrEmpty(status) ? "Không rõ" : status, "bg-secondary")
+    };
+
+    var badge = StatusBadge(Model.Status);
+    var itemCount = Model.OrderDetails?.Sum(d => d.Quantity) ?? 0;
 }
 
-<div class="crud-theme">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0"><i class="fas fa-receipt me-2"></i>Chi tiết đơn hàng</h4>
-                </div>
+<div class="order-details">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-receipt me-2"></i>Đơn hàng #@Model.OrderId</h2>
+            <p class="text-muted mb-0">
+                <i class="far fa-clock me-1"></i>@(Model.OrderDate?.ToString("dd/MM/yyyy HH:mm") ?? "—")
+            </p>
+        </div>
+        <span class="badge @badge.css order-status-badge">@badge.label</span>
+    </div>
+
+    <div class="row g-4">
+        <!-- Cột trái: Khách hàng + Giao nhận -->
+        <div class="col-lg-5">
+            <div class="card od-card mb-4">
+                <div class="card-header"><i class="fas fa-user me-2"></i>Khách hàng</div>
                 <div class="card-body">
-                    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.OrderDate)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.OrderDate)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.TotalAmount)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.TotalAmount)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Status)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Status)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.PaymentMethod)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.PaymentMethod)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.DeliveryMethod)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.DeliveryMethod)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Customer)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Customer.CustomerId)
-        </dd>
-                    </dl>
-                    <div class="d-flex justify-content-between mt-3">
-                        <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
-                        <a asp-action="Edit" asp-route-id="@Model?.OrderId" class="btn btn-warning"><i class="fas fa-edit me-1"></i>Sửa</a>
+                    <div class="od-info">
+                        <span class="od-info__label">Họ tên</span>
+                        <span class="od-info__value">@(Model.Customer?.FullName ?? "—")</span>
+                    </div>
+                    <div class="od-info">
+                        <span class="od-info__label">Mã KH</span>
+                        <span class="od-info__value">#@Model.CustomerId</span>
+                    </div>
+                    <div class="od-info">
+                        <span class="od-info__label">Email</span>
+                        <span class="od-info__value">@(Model.Customer?.Email ?? "—")</span>
+                    </div>
+                    <div class="od-info">
+                        <span class="od-info__label">Điện thoại</span>
+                        <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.Customer?.Phone) ? "—" : Model.Customer!.Phone)</span>
+                    </div>
+                    <div class="od-info">
+                        <span class="od-info__label">Địa chỉ</span>
+                        <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.Customer?.Address) ? "—" : Model.Customer!.Address)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card od-card">
+                <div class="card-header"><i class="fas fa-truck me-2"></i>Giao nhận & Thanh toán</div>
+                <div class="card-body">
+                    <div class="od-info">
+                        <span class="od-info__label">Phương thức giao</span>
+                        <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.DeliveryMethod) ? "—" : Model.DeliveryMethod)</span>
+                    </div>
+                    <div class="od-info">
+                        <span class="od-info__label">Thanh toán</span>
+                        <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.PaymentMethod) ? "—" : Model.PaymentMethod)</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.DiscountStrategyName))
+                    {
+                        <div class="od-info">
+                            <span class="od-info__label">Khuyến mãi</span>
+                            <span class="od-info__value">@Model.DiscountStrategyName</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột phải: Sản phẩm + Tổng tiền -->
+        <div class="col-lg-7">
+            <div class="card od-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-box-open me-2"></i>Sản phẩm</span>
+                    <span class="text-muted small">@itemCount sản phẩm</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.OrderDetails != null && Model.OrderDetails.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table od-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Sản phẩm</th>
+                                        <th class="text-end">Đơn giá</th>
+                                        <th class="text-center">SL</th>
+                                        <th class="text-end">Thành tiền</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.OrderDetails)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-3">
+                                                    @if (!string.IsNullOrWhiteSpace(item.Product?.ImageUrl))
+                                                    {
+                                                        <img src="@item.Product.ImageUrl" alt="@item.Product?.ProductName" class="od-thumb" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="od-thumb od-thumb--empty"><i class="fas fa-image"></i></div>
+                                                    }
+                                                    <div>
+                                                        <div class="od-product-name">@(item.Product?.ProductName ?? "Sản phẩm đã xóa")</div>
+                                                        @if (item.Product?.Category != null)
+                                                        {
+                                                            <div class="text-muted small">@item.Product.Category.CategoryName</div>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="text-end">@item.UnitPrice.ToString("#,##0") ₫</td>
+                                            <td class="text-center">@item.Quantity</td>
+                                            <td class="text-end fw-semibold">@((item.UnitPrice * item.Quantity).ToString("#,##0")) ₫</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-box-open fa-2x mb-2"></i>
+                            <div>Đơn hàng chưa có sản phẩm nào.</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Tổng tiền -->
+            <div class="card od-card mt-4">
+                <div class="card-body">
+                    <div class="od-summary">
+                        <span>Tạm tính</span>
+                        <span>@Model.Subtotal.ToString("#,##0") ₫</span>
+                    </div>
+                    @if (Model.DiscountValue > 0)
+                    {
+                        <div class="od-summary od-summary--discount">
+                            <span>Giảm giá</span>
+                            <span>- @Model.DiscountValue.ToString("#,##0") ₫</span>
+                        </div>
+                    }
+                    <hr class="od-divider" />
+                    <div class="od-summary od-summary--total">
+                        <span>Tổng cộng</span>
+                        <span>@Model.TotalAmount.ToString("#,##0") ₫</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Hành động -->
+    <div class="d-flex justify-content-between mt-4">
+        <a asp-action="Index" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
+        <a asp-action="Edit" asp-route-id="@Model.OrderId" class="btn btn-warning"><i class="fas fa-edit me-1"></i>Sửa đơn hàng</a>
+    </div>
 </div>
+
+<style>
+    .order-details { color: var(--lux-white, #fff); }
+
+    .order-details h2 { font-family: 'Montserrat', sans-serif; font-weight: 300; letter-spacing: 0.08em; }
+
+    .order-status-badge {
+        font-size: 0.85rem;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        padding: 0.55rem 1.1rem;
+    }
+
+    .od-card {
+        background: var(--lux-surface, #111) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 4px !important;
+        height: auto;
+    }
+
+    .od-card .card-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.85rem;
+    }
+
+    /* Hàng thông tin label - value */
+    .od-info {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .od-info:last-child { border-bottom: none; }
+
+    .od-info__label {
+        color: var(--lux-muted, #b3b3b3);
+        font-size: 0.85rem;
+        flex: 0 0 auto;
+    }
+
+    .od-info__value {
+        color: var(--lux-white, #fff);
+        text-align: right;
+        word-break: break-word;
+    }
+
+    /* Bảng sản phẩm */
+    .od-table { color: var(--lux-white, #fff); }
+
+    .od-table thead th {
+        background: transparent !important;
+        color: var(--lux-muted, #b3b3b3) !important;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.72rem;
+        font-weight: 500;
+    }
+
+    .od-table tbody td {
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+        vertical-align: middle;
+    }
+
+    .od-table tbody tr:last-child td { border-bottom: none !important; }
+
+    .od-thumb {
+        width: 52px;
+        height: 52px;
+        object-fit: cover;
+        border-radius: 4px;
+        background: #000;
+    }
+
+    .od-thumb--empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--lux-faint, #808080);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .od-product-name { font-weight: 500; }
+
+    /* Tổng tiền */
+    .od-summary {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.35rem 0;
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .od-summary--discount span:last-child { color: #ff6b6b; }
+
+    .od-divider { border-color: var(--lux-line, rgba(255,255,255,0.12)); opacity: 1; }
+
+    .od-summary--total {
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 1.25rem;
+        letter-spacing: 0.04em;
+    }
+</style>

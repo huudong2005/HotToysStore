@@ -1,4 +1,4 @@
-@model IEnumerable<ToyStore.Models.Admin>
+@model IEnumerable<ToyStore.Domain.Entities.Admin>
 @{
     ViewData["Title"] = "Quản lý nhân viên";
 }
@@ -101,12 +101,13 @@
     .avatar-circle {
         width: 35px;
         height: 35px;
-        background: linear-gradient(135deg, #00ff88, #00ffff);
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.25);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #000;
+        color: #ffffff;
         font-weight: bold;
         font-size: 0.9rem;
     }
@@ -114,21 +115,26 @@
     .table th {
         border-top: none;
         font-weight: 600;
-        background: linear-gradient(135deg, #1a1a2e, #0a0a0a) !important;
-        color: #00ff88 !important;
+        background: transparent !important;
+        color: #ffffff !important;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
     }
 
     .table td {
         vertical-align: middle;
-        color: #fff !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.06) !important;
     }
 
     .table-striped > tbody > tr:nth-of-type(odd) > td {
-        background-color: rgba(26, 26, 46, 0.3) !important;
+        background-color: rgba(255, 255, 255, 0.02) !important;
     }
 
     .table-hover > tbody > tr:hover > td {
-        background-color: rgba(0, 255, 136, 0.1) !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
     }
 
     .btn-group .btn {
@@ -140,83 +146,70 @@
     }
 
     .card {
-        background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(10, 10, 10, 0.9)) !important;
-        border: 2px solid #00ff88 !important;
-        border-radius: 1rem !important;
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.3) !important;
+        background: #111111 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
     }
 
     .card-body {
-        color: #fff !important;
+        color: #ffffff !important;
     }
 
     .alert-success {
-        background: rgba(0, 255, 136, 0.1) !important;
-        border: 1px solid #00ff88 !important;
-        color: #00ff88 !important;
+        background: #111111 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-left: 2px solid #ffffff !important;
+        color: #ffffff !important;
+        border-radius: 0 !important;
     }
 
     .alert-danger {
-        background: rgba(255, 107, 107, 0.1) !important;
-        border: 1px solid #ff6b6b !important;
-        color: #ff6b6b !important;
+        background: #111111 !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-left: 2px solid #b3b3b3 !important;
+        color: #ffffff !important;
+        border-radius: 0 !important;
     }
 
-    .btn-primary {
-        background: linear-gradient(135deg, #00ff88, #00ffff) !important;
-        color: #000 !important;
-        border: none !important;
-        font-weight: 600;
-    }
-
-    .btn-primary:hover {
-        background: linear-gradient(135deg, #00ffff, #00ff88) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
-        color: #000 !important;
-    }
-
-    .btn-info {
-        background: rgba(0, 255, 255, 0.1) !important;
-        border: 1px solid #00ffff !important;
-        color: #00ffff !important;
-    }
-
-    .btn-info:hover {
-        background: #00ffff !important;
-        color: #000 !important;
-        border-color: #00ffff !important;
-    }
-
-    .btn-warning {
-        background: rgba(255, 193, 7, 0.1) !important;
-        border: 1px solid #ffc107 !important;
-        color: #ffc107 !important;
-    }
-
-    .btn-warning:hover {
-        background: #ffc107 !important;
-        color: #000 !important;
-        border-color: #ffc107 !important;
-    }
-
+    .btn-primary,
+    .btn-info,
+    .btn-warning,
     .btn-danger {
-        background: rgba(255, 107, 107, 0.1) !important;
-        border: 1px solid #ff6b6b !important;
-        color: #ff6b6b !important;
+        background: transparent !important;
+        border: 1px solid #ffffff !important;
+        color: #ffffff !important;
+        border-radius: 0 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        box-shadow: none !important;
+        transition: all 0.4s ease;
     }
 
+    .btn-primary:hover,
+    .btn-info:hover,
+    .btn-warning:hover,
     .btn-danger:hover {
-        background: #ff6b6b !important;
-        color: #fff !important;
-        border-color: #ff6b6b !important;
+        background: #ffffff !important;
+        color: #000 !important;
+        border-color: #ffffff !important;
+        box-shadow: none !important;
     }
 
     .text-muted {
-        color: #b0b0ff !important;
+        color: #b3b3b3 !important;
     }
 
     .badge {
+        background: transparent !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
+        color: #b3b3b3 !important;
+        border-radius: 0 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-family: 'Montserrat', sans-serif;
         font-weight: 600;
     }
 </style>

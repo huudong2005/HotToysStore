@@ -1,105 +1,97 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using ToyStore.Models;
 using ToyStore.Attributes;
+using ToyStore.Domain.Entities;
+using ToyStore.Domain.Events;
+using ToyStore.Domain.Interfaces;
+using ToyStore.Helpers;
+using ToyStore.Models;
+using ToyStore.Services;
 
 namespace ToyStore.Controllers
 {
-    [AuthorizeRole("Customer")]
     public class OrderController : Controller
     {
-        private readonly ToyStoreContext _context;
-        private const string CART_SESSION_KEY = "ShoppingCart";
+        private readonly ICheckoutFacade _checkoutFacade;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ISessionService _sessionService;
+        private readonly IOrderEventDispatcher _orderEventDispatcher;
+        private readonly IGuestCheckoutService _guestCheckoutService;
+        private readonly ICartStorageService _cartStorage;
 
-        public OrderController(ToyStoreContext context)
+        public OrderController(
+            ICheckoutFacade checkoutFacade,
+            IUnitOfWork unitOfWork,
+            ISessionService sessionService,
+            IOrderEventDispatcher orderEventDispatcher,
+            IGuestCheckoutService guestCheckoutService,
+            ICartStorageService cartStorage)
         {
-            _context = context;
+            _checkoutFacade = checkoutFacade;
+            _unitOfWork = unitOfWork;
+            _sessionService = sessionService;
+            _orderEventDispatcher = orderEventDispatcher;
+            _guestCheckoutService = guestCheckoutService;
+            _cartStorage = cartStorage;
         }
 
-        // POST: Order/Create
         [HttpPost]
-        public async Task<IActionResult> Create(Order order)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(
+            string paymentMethod,
+            string? guestFullName,
+            string? guestEmail,
+            string? guestPhone,
+            string? guestAddress)
         {
             try
             {
-                var cart = GetCart();
-                
+                var cart = await _cartStorage.GetCartAsync(HttpContext);
                 if (!cart.Items.Any())
                 {
-                    TempData["ErrorMessage"] = "Giỏ hàng trống";
+                    TempData["ErrorMessage"] = "Giỏ hàng trống, không thể thanh toán.";
                     return RedirectToAction("Index", "Cart");
                 }
 
-                // Check if customer is logged in
-                var customerId = GetCurrentCustomerId();
-                if (customerId == 0)
+                var customerId = await ResolveCustomerIdForCheckoutAsync(
+                    guestFullName, guestEmail, guestPhone, guestAddress);
+
+                if (string.Equals(paymentMethod, "VNPAY", StringComparison.OrdinalIgnoreCase))
                 {
-                    TempData["ErrorMessage"] = "Vui lòng đăng nhập để đặt hàng";
-                    return RedirectToAction("Login", "Auth");
+                    return RedirectToAction("CreatePaymentUrlGet", "Payment");
                 }
 
-                // Create order with basic properties only (using existing columns)
-                var newOrder = new Order
+                var createdOrder = await _checkoutFacade.PlaceOrderAsync(cart, customerId, paymentMethod);
+
+                await _cartStorage.ClearCartAfterOrderAsync(HttpContext, customerId);
+
+                await _orderEventDispatcher.PublishAsync(new OrderConfirmedEvent(createdOrder));
+
+                if (!_sessionService.IsCustomer(HttpContext))
                 {
-                    CustomerId = customerId,
-                    OrderDate = DateTime.Now,
-                    Status = "Pending",
-                    TotalAmount = cart.Total,
-                    PaymentMethod = order.PaymentMethod ?? "COD"
-                };
-
-                _context.Orders.Add(newOrder);
-                await _context.SaveChangesAsync();
-
-                // Create order details
-                foreach (var item in cart.Items)
-                {
-                    var orderDetail = new OrderDetail
-                    {
-                        OrderId = newOrder.OrderId,
-                        ProductId = item.ProductId,
-                        Quantity = item.Quantity,
-                        UnitPrice = item.Price
-                    };
-                    
-                    _context.OrderDetails.Add(orderDetail);
-
-                    // Update product stock
-                    var product = await _context.Products.FindAsync(item.ProductId);
-                    if (product != null)
-                    {
-                        product.Stock -= item.Quantity;
-                        if (product.Stock < 0) product.Stock = 0;
-                    }
+                    GuestOrderSession.GrantOrderAccess(HttpContext, createdOrder.OrderId);
+                    GuestOrderSession.ClearGuestCheckout(HttpContext);
+                    TempData["SuccessMessage"] = $"Đặt hàng thành công! Mã đơn hàng: #{createdOrder.OrderId}";
+                    return RedirectToAction(nameof(Confirmation), new { id = createdOrder.OrderId });
                 }
 
-                await _context.SaveChangesAsync();
-
-                // Clear cart
-                cart.Clear();
-                SaveCart(cart);
-
-                TempData["SuccessMessage"] = $"Đặt hàng thành công! Mã đơn hàng: #{newOrder.OrderId}";
-                return RedirectToAction("Details", new { id = newOrder.OrderId });
+                TempData["SuccessMessage"] = $"Đặt hàng thành công! Mã đơn hàng: #{createdOrder.OrderId}";
+                return RedirectToAction(nameof(Details), new { id = createdOrder.OrderId });
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "Lỗi: " + ex.Message + " - Chi tiết: " + (ex.InnerException?.Message ?? "");
+                TempData["ErrorMessage"] = ex.Message;
                 return RedirectToAction("Checkout", "Cart");
             }
         }
 
-        // GET: Order/Details/5
+        [AuthorizeRole("Customer")]
         public async Task<IActionResult> Details(int id)
         {
-            var order = await _context.Orders
-                .Include(o => o.Customer)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.Category)
-                .FirstOrDefaultAsync(o => o.OrderId == id);
+            var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(id);
+            var customerId = _sessionService.GetUserId(HttpContext);
 
-            if (order == null || order.CustomerId != GetCurrentCustomerId())
+            if (order == null || order.CustomerId != customerId)
             {
                 return NotFound();
             }
@@ -107,24 +99,43 @@ namespace ToyStore.Controllers
             return View(order);
         }
 
-        // POST: Order/BuyNow
+        /// <summary>
+        /// Trang xác nhận đơn cho khách vãng lai (hoặc sau thanh toán).
+        /// </summary>
+        public async Task<IActionResult> Confirmation(int id)
+        {
+            var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(id);
+            if (order == null)
+            {
+                return NotFound();
+            }
+
+            var customerId = _sessionService.GetUserId(HttpContext);
+            if (_sessionService.IsCustomer(HttpContext))
+            {
+                if (order.CustomerId != customerId)
+                {
+                    return NotFound();
+                }
+
+                return View(order);
+            }
+
+            if (!GuestOrderSession.CanAccessOrder(HttpContext, id, 0))
+            {
+                TempData["ErrorMessage"] = "Bạn không có quyền xem đơn hàng này.";
+                return RedirectToAction("Index", "Home");
+            }
+
+            return View(order);
+        }
+
         [HttpPost]
         public async Task<IActionResult> BuyNow(int productId, int quantity = 1)
         {
             try
             {
-                // Check if customer is logged in
-                var customerId = GetCurrentCustomerId();
-                if (customerId == 0)
-                {
-                    TempData["ErrorMessage"] = "Vui lòng đăng nhập để mua hàng";
-                    return RedirectToAction("Login", "Auth");
-                }
-
-                // Get product details
-                var product = await _context.Products
-                    .Include(p => p.Category)
-                    .FirstOrDefaultAsync(p => p.ProductId == productId);
+                var product = await _unitOfWork.Products.GetProductWithCategoryAsync(productId);
 
                 if (product == null)
                 {
@@ -150,38 +161,70 @@ namespace ToyStore.Controllers
                     return RedirectToAction("ProductDetails", "Home", new { id = productId });
                 }
 
-                // Create order directly
-                var newOrder = new Order
+                var customerId = _sessionService.GetUserId(HttpContext);
+                if (customerId == 0)
                 {
-                    CustomerId = customerId,
-                    OrderDate = DateTime.Now,
-                    Status = "Pending",
-                    TotalAmount = product.Price * quantity,
-                    PaymentMethod = "COD"
-                };
+                    var cart = await _cartStorage.GetCartAsync(HttpContext);
+                    cart.Clear();
+                    cart.AddItem(product, quantity);
+                    await _cartStorage.SaveCartAsync(HttpContext, cart);
+                    TempData["SuccessMessage"] = "Đã thêm sản phẩm vào giỏ. Vui lòng nhập thông tin giao hàng để hoàn tất đơn.";
+                    return RedirectToAction("Checkout", "Cart");
+                }
 
-                _context.Orders.Add(newOrder);
-                await _context.SaveChangesAsync();
+                await _unitOfWork.BeginTransactionAsync();
 
-                // Create order detail
-                var orderDetail = new OrderDetail
+                try
                 {
-                    OrderId = newOrder.OrderId,
-                    ProductId = product.ProductId,
-                    Quantity = quantity,
-                    UnitPrice = product.Price
-                };
-                
-                _context.OrderDetails.Add(orderDetail);
+                    decimal subtotal = product.Price * quantity;
+                    decimal discountValue = 0;
+                    decimal finalTotal = subtotal;
 
-                // Update product stock
-                product.Stock -= quantity;
-                if (product.Stock < 0) product.Stock = 0;
+                    var newOrder = new Order
+                    {
+                        CustomerId = customerId,
+                        OrderDate = DateTime.Now,
+                        Status = "Pending",
+                        Subtotal = subtotal,
+                        DiscountValue = discountValue,
+                        TotalAmount = finalTotal,
+                        DiscountStrategyName = "NoDiscount",
+                        PaymentMethod = "COD"
+                    };
 
-                await _context.SaveChangesAsync();
+                    await _unitOfWork.Orders.AddAsync(newOrder);
+                    await _unitOfWork.SaveChangesAsync();
 
-                TempData["SuccessMessage"] = $"Mua ngay thành công! Mã đơn hàng: #{newOrder.OrderId}";
-                return RedirectToAction("Details", new { id = newOrder.OrderId });
+                    var orderDetail = new OrderDetail
+                    {
+                        OrderId = newOrder.OrderId,
+                        ProductId = product.ProductId,
+                        Quantity = quantity,
+                        UnitPrice = product.Price
+                    };
+
+                    await _unitOfWork.OrderDetails.AddAsync(orderDetail);
+
+                    product.Stock -= quantity;
+                    if (product.Stock < 0)
+                    {
+                        product.Stock = 0;
+                    }
+
+                    _unitOfWork.Products.Update(product);
+
+                    await _unitOfWork.SaveChangesAsync();
+                    await _orderEventDispatcher.PublishAsync(new OrderConfirmedEvent(newOrder));
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    TempData["SuccessMessage"] = $"Mua ngay thành công! Mã đơn hàng: #{newOrder.OrderId}";
+                    return RedirectToAction("Details", new { id = newOrder.OrderId });
+                }
+                catch
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
@@ -190,59 +233,67 @@ namespace ToyStore.Controllers
             }
         }
 
-        // GET: Order/MyOrders
+        [AuthorizeRole("Customer")]
         public async Task<IActionResult> MyOrders()
         {
-            var customerId = GetCurrentCustomerId();
-            var orders = await _context.Orders
-                .Include(o => o.Customer)
-                .Include(o => o.OrderDetails)
-                    .ThenInclude(od => od.Product)
-                        .ThenInclude(p => p.Category)
-                .Where(o => o.CustomerId == customerId)
-                .OrderByDescending(o => o.OrderDate)
-                .ToListAsync();
+            var customerId = _sessionService.GetUserId(HttpContext);
+            var orders = await _unitOfWork.Orders.GetOrdersByCustomerIdAsync(customerId);
 
             return View(orders);
         }
 
-        // POST: Order/Cancel/5
         [HttpPost]
+        [AuthorizeRole("Customer")]
         public async Task<IActionResult> Cancel(int id)
         {
             try
             {
-                var order = await _context.Orders
-                    .Include(o => o.OrderDetails)
-                    .FirstOrDefaultAsync(o => o.OrderId == id && o.CustomerId == GetCurrentCustomerId());
+                var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(id);
+                var customerId = _sessionService.GetUserId(HttpContext);
 
-                if (order == null)
+                if (order == null || order.CustomerId != customerId)
                 {
                     TempData["ErrorMessage"] = "Đơn hàng không tồn tại";
                     return RedirectToAction("MyOrders");
                 }
 
-                if (order.Status != "Pending")
+                if (!order.CanCancel())
                 {
-                    TempData["ErrorMessage"] = "Chỉ có thể hủy đơn hàng đang chờ xử lý";
+                    var stateName = order.GetState().StateName;
+                    TempData["ErrorMessage"] =
+                        $"Không thể hủy đơn hàng ở trạng thái {stateName}. Chỉ có thể hủy đơn hàng ở trạng thái Pending hoặc Confirmed.";
                     return RedirectToAction("MyOrders");
                 }
 
-                // Restore product stock
-                foreach (var detail in order.OrderDetails)
+                await _unitOfWork.BeginTransactionAsync();
+
+                try
                 {
-                    var product = await _context.Products.FindAsync(detail.ProductId);
-                    if (product != null)
+                    foreach (var detail in order.OrderDetails)
                     {
-                        product.Stock += detail.Quantity;
+                        var product = await _unitOfWork.Products.GetByIdAsync(detail.ProductId);
+                        if (product != null)
+                        {
+                            product.Stock += detail.Quantity;
+                            _unitOfWork.Products.Update(product);
+                        }
                     }
+
+                    order.Cancel();
+                    _unitOfWork.Orders.Update(order);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    await _orderEventDispatcher.PublishAsync(new OrderCancelledEvent(order));
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    TempData["SuccessMessage"] = "Đã hủy đơn hàng thành công";
+                    return RedirectToAction("MyOrders");
                 }
-
-                order.Status = "Cancelled";
-                await _context.SaveChangesAsync();
-
-                TempData["SuccessMessage"] = "Đã hủy đơn hàng thành công";
-                return RedirectToAction("MyOrders");
+                catch
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
@@ -251,26 +302,63 @@ namespace ToyStore.Controllers
             }
         }
 
-        private ShoppingCart GetCart()
+        private async Task<int> ResolveCustomerIdForCheckoutAsync(
+            string? guestFullName,
+            string? guestEmail,
+            string? guestPhone,
+            string? guestAddress)
         {
-            var cartJson = HttpContext.Session.GetString(CART_SESSION_KEY);
-            return ShoppingCart.FromJson(cartJson ?? "");
-        }
-
-        private void SaveCart(ShoppingCart cart)
-        {
-            var cartJson = cart.ToJson();
-            HttpContext.Session.SetString(CART_SESSION_KEY, cartJson);
-        }
-
-        private int GetCurrentCustomerId()
-        {
-            var userId = HttpContext.Session.GetString("UserId");
-            if (int.TryParse(userId, out int id))
+            if (_sessionService.IsCustomer(HttpContext))
             {
-                return id;
+                return _sessionService.GetUserId(HttpContext);
             }
-            return 0;
+
+            var guestInfo = new GuestCheckoutInfo
+            {
+                FullName = guestFullName ?? string.Empty,
+                Email = guestEmail ?? string.Empty,
+                Phone = guestPhone ?? string.Empty,
+                Address = guestAddress ?? string.Empty
+            };
+
+            if (!TryValidateGuestInfo(guestInfo, out var validationError))
+            {
+                throw new InvalidOperationException(validationError);
+            }
+
+            GuestOrderSession.SaveGuestCheckout(HttpContext, guestInfo);
+            return await _guestCheckoutService.ResolveCustomerIdAsync(HttpContext, guestInfo);
         }
+
+        private static bool TryValidateGuestInfo(GuestCheckoutInfo info, out string error)
+        {
+            if (string.IsNullOrWhiteSpace(info.FullName))
+            {
+                error = "Vui lòng nhập họ tên người nhận.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(info.Email) || !info.Email.Contains('@'))
+            {
+                error = "Vui lòng nhập email hợp lệ.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(info.Phone))
+            {
+                error = "Vui lòng nhập số điện thoại.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(info.Address))
+            {
+                error = "Vui lòng nhập địa chỉ giao hàng.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
     }
 }
