@@ -8,8 +8,8 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <h4 class="mb-0">Chỉnh sửa sản phẩm</h4>
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-edit me-2"></i>Chỉnh sửa sản phẩm</h4>
                 </div>
                 <div class="card-body">
                     <form asp-controller="Products" asp-action="Edit" method="post">
@@ -84,6 +84,106 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* ===== Chỉnh sửa sản phẩm - Luxury dark ===== */
+    .crud-theme .card {
+        background: var(--lux-surface, #111) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+    }
+
+    .crud-theme .card-header {
+        background: transparent !important;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        padding: 1.1rem 1.5rem;
+    }
+
+    .crud-theme .card-header h4 {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 300;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .crud-theme .card-body { padding: 1.75rem; }
+
+    .crud-theme .form-label {
+        color: var(--lux-muted, #b3b3b3) !important;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.74rem;
+        font-weight: 500;
+    }
+
+    .crud-theme .form-control,
+    .crud-theme .form-select {
+        background: #0d0d0d !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.14)) !important;
+        border-radius: 4px !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .crud-theme .form-control::placeholder { color: var(--lux-faint, #808080) !important; }
+
+    .crud-theme .form-control:focus,
+    .crud-theme .form-select:focus {
+        background: #0d0d0d !important;
+        border-color: rgba(255,255,255,0.55) !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    /* FIX: option của dropdown native - nền tối, chữ trắng để đọc rõ */
+    .crud-theme select.form-select option {
+        background-color: #111 !important;
+        color: #fff !important;
+    }
+
+    .crud-theme select.form-select option:checked,
+    .crud-theme select.form-select option:hover {
+        background-color: #1f1f1f !important;
+        color: #fff !important;
+    }
+
+    /* Select2 (Danh mục) đồng bộ tông tối */
+    .select2-container--bootstrap-5 .select2-selection {
+        background-color: #0d0d0d !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.14)) !important;
+        border-radius: 4px !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection__rendered,
+    .select2-container--bootstrap-5 .select2-selection__placeholder {
+        color: #fff !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-dropdown,
+    .select2-dropdown {
+        background-color: #111 !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.18)) !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-results__option {
+        color: #b3b3b3 !important;
+        background-color: #111 !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-results__option--highlighted,
+    .select2-container--bootstrap-5 .select2-results__option[aria-selected="true"] {
+        background-color: #1f1f1f !important;
+        color: #fff !important;
+    }
+
+    .select2-search--dropdown .select2-search__field {
+        background-color: #0d0d0d !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.18)) !important;
+        color: #fff !important;
+    }
+</style>
 
 @section Scripts {
     <script>

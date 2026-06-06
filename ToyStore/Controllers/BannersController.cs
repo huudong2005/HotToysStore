@@ -13,7 +13,7 @@ namespace ToyStore.Controllers
         private readonly IWebHostEnvironment _env;
 
         private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
-        private const long MaxFileSize = 5 * 1024 * 1024; // 5MB
+        private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
 
         public BannersController(IUnitOfWork unitOfWork, IWebHostEnvironment env)
         {
@@ -215,7 +215,7 @@ namespace ToyStore.Controllers
 
                 if (imageFile.Length > MaxFileSize)
                 {
-                    return (false, string.Empty, "Kích thước ảnh tối đa là 5MB.");
+                    return (false, string.Empty, "Kích thước ảnh tối đa là 10MB.");
                 }
 
                 var webRoot = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
