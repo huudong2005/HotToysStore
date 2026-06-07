@@ -42,6 +42,7 @@ namespace ToyStore.Controllers
         {
             if (id == null) return NotFound();
 
+            // Lấy danh mục kèm danh sách sản phẩm (Include Products, dùng FirstOrDefaultAsync - an toàn Oracle)
             var category = await _categoryRepository.GetCategoryWithProductsAsync(id.Value);
             if (category == null) return NotFound();
 

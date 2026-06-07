@@ -59,103 +59,133 @@
     </div>
 }
 
-<div class="card">
-    <div class="card-body">
-        @if (Model.Any())
+@if (Model.Any())
+{
+    // Gom nhóm sản phẩm theo tên danh mục
+    var groupedProducts = Model
+        .GroupBy(p => p.Category?.CategoryName ?? "Chưa phân loại")
+        .OrderBy(g => g.Key)
+        .ToList();
+    int groupIndex = 0;
+
+    <div class="accordion lux-accordion" id="productsAccordion">
+        @foreach (var group in groupedProducts)
         {
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th><i class="fas fa-image me-2"></i>Hình ảnh</th>
-                            <th><i class="fas fa-box me-2"></i>Tên sản phẩm</th>
-                            <th><i class="fas fa-tags me-2"></i>Danh mục</th>
-                            <th><i class="fas fa-dollar-sign me-2"></i>Giá</th>
-                            <th><i class="fas fa-warehouse me-2"></i>Tồn kho</th>
-                            <th><i class="fas fa-toggle-on me-2"></i>Trạng thái</th>
-                            <th><i class="fas fa-cogs me-2"></i>Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var item in Model)
-                        {
-                            <tr>
-                                <td>
-                                    @if (!string.IsNullOrEmpty(item.ImageUrl))
+            var headingId = $"heading_{groupIndex}";
+            var collapseId = $"collapse_{groupIndex}";
+            var isFirst = groupIndex == 0;
+
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="@headingId">
+                    <button class="accordion-button @(isFirst ? "" : "collapsed")" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#@collapseId"
+                            aria-expanded="@(isFirst ? "true" : "false")" aria-controls="@collapseId">
+                        <i class="fas fa-tags me-2"></i>
+                        <span class="lux-accordion__title">@group.Key</span>
+                        <span class="lux-accordion__count">@group.Count() sản phẩm</span>
+                    </button>
+                </h2>
+                <div id="@collapseId" class="accordion-collapse collapse @(isFirst ? "show" : "")"
+                     aria-labelledby="@headingId">
+                    <div class="accordion-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th><i class="fas fa-image me-2"></i>Hình ảnh</th>
+                                        <th><i class="fas fa-box me-2"></i>Tên sản phẩm</th>
+                                        <th><i class="fas fa-dollar-sign me-2"></i>Giá</th>
+                                        <th><i class="fas fa-warehouse me-2"></i>Tồn kho</th>
+                                        <th><i class="fas fa-toggle-on me-2"></i>Trạng thái</th>
+                                        <th><i class="fas fa-cogs me-2"></i>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in group)
                                     {
-                                        <img src="@item.ImageUrl" alt="@item.ProductName" class="product-thumbnail" />
+                                        <tr>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                                {
+                                                    <img src="@item.ImageUrl" alt="@item.ProductName" class="product-thumbnail" />
+                                                }
+                                                else
+                                                {
+                                                    <div class="product-thumbnail-placeholder">
+                                                        <i class="fas fa-image"></i>
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>@item.ProductName</strong>
+                                                    @if (!string.IsNullOrEmpty(item.Description))
+                                                    {
+                                                        <br><small class="text-muted">@(item.Description.Length > 50 ? item.Description.Substring(0, 50) + "..." : item.Description)</small>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong class="text-success">@item.Price.ToString("N0") ₫</strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge @(item.Stock > 10 ? "bg-success" : item.Stock > 0 ? "bg-warning" : "bg-danger")">
+                                                    @item.Stock
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if (item.Status == true)
+                                                {
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-check-circle me-1"></i>Đang bán
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">
+                                                        <i class="fas fa-pause-circle me-1"></i>Ngừng bán
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="/Products/Details/@item.ProductId" class="btn btn-sm btn-info" title="Xem chi tiết">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="/Products/Edit/@item.ProductId" class="btn btn-sm btn-warning" title="Sửa">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="/Products/Delete/@item.ProductId" class="btn btn-sm btn-danger" title="Xóa">
+                                                        <i class="fas fa-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     }
-                                    else
-                                    {
-                                        <div class="product-thumbnail-placeholder">
-                                            <i class="fas fa-image"></i>
-                                        </div>
-                                    }
-                                </td>
-                                <td>
-                                    <div>
-                                        <strong>@item.ProductName</strong>
-                                        @if (!string.IsNullOrEmpty(item.Description))
-                                        {
-                                            <br><small class="text-muted">@(item.Description.Length > 50 ? item.Description.Substring(0, 50) + "..." : item.Description)</small>
-                                        }
-                                    </div>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">@item.Category.CategoryName</span>
-                                </td>
-                                <td>
-                                    <strong class="text-success">@item.Price.ToString("N0") ₫</strong>
-                                </td>
-                                <td>
-                                    <span class="badge @(item.Stock > 10 ? "bg-success" : item.Stock > 0 ? "bg-warning" : "bg-danger")">
-                                        @item.Stock
-                                    </span>
-                                </td>
-                                <td>
-                                    @if (item.Status == true)
-                                    {
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-check-circle me-1"></i>Đang bán
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="badge bg-secondary">
-                                            <i class="fas fa-pause-circle me-1"></i>Ngừng bán
-                                        </span>
-                                    }
-                                </td>
-                                <td>
-                                    <div class="btn-group" role="group">
-                                        <a href="/Products/Details/@item.ProductId" class="btn btn-sm btn-info" title="Xem chi tiết">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="/Products/Edit/@item.ProductId" class="btn btn-sm btn-warning" title="Sửa">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <a href="/Products/Delete/@item.ProductId" class="btn btn-sm btn-danger" title="Xóa">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            groupIndex++;
         }
-        else
-        {
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
             <div class="text-center py-4">
                 <i class="fas fa-box fa-3x text-muted mb-3"></i>
                 <h5 class="text-muted">Chưa có sản phẩm nào</h5>
                 <p class="text-muted">Hãy thêm sản phẩm đầu tiên</p>
                 <a href="/Products/Create" class="btn btn-primary">Thêm sản phẩm</a>
             </div>
-        }
+        </div>
     </div>
-</div>
+}
 
 <style>
     /* ===== Quản lý sản phẩm - Luxury Cinematic Gallery ===== */
@@ -309,6 +339,65 @@
 
     .gap-2 { gap: 0.5rem !important; }
     .gap-3 { gap: 1rem !important; }
+
+    /* ===== Accordion gom nhóm theo danh mục ===== */
+    .lux-accordion { --bs-accordion-border-color: #333; }
+
+    .lux-accordion .accordion-item {
+        background-color: transparent !important;
+        border: 1px solid #333 !important;
+        border-radius: 0 !important;
+        margin-bottom: 0.75rem;
+        overflow: hidden;
+    }
+
+    .lux-accordion .accordion-button {
+        background-color: #1a1d24 !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.95rem;
+        padding: 1rem 1.25rem;
+    }
+
+    .lux-accordion .accordion-button:not(.collapsed) {
+        background-color: #1a1d24 !important;
+        color: var(--lux-white, #fff) !important;
+        box-shadow: none !important;
+    }
+
+    /* Tắt viền/outline xanh mặc định khi focus */
+    .lux-accordion .accordion-button:focus {
+        box-shadow: none !important;
+        border-color: #333 !important;
+        outline: none !important;
+    }
+
+    /* Mũi tên accordion -> trắng */
+    .lux-accordion .accordion-button::after {
+        filter: invert(1) brightness(2);
+    }
+
+    .lux-accordion__count {
+        margin-left: auto;
+        margin-right: 0.9rem;
+        font-size: 0.7rem;
+        color: var(--lux-muted, #b3b3b3);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25));
+        border-radius: 0;
+        padding: 0.25rem 0.7rem;
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+    }
+
+    .lux-accordion .accordion-body {
+        background-color: var(--lux-surface, #111) !important;
+        border-top: 1px solid #333;
+    }
 
     @@media (max-width: 768px) {
         .d-flex.justify-content-between {

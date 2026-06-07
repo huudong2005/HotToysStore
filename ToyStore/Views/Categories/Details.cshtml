@@ -1,24 +1,271 @@
 @model ToyStore.Domain.Entities.Category
 
 @{
-    ViewData["Title"] = "Details";
+    ViewData["Title"] = "Chi tiết danh mục";
+    var products = Model.Products ?? new List<ToyStore.Domain.Entities.Product>();
 }
 
-<h1>Details</h1>
+<div class="cat-details container">
+    <!-- Header -->
+    <div class="cat-header">
+        <div>
+            <span class="cat-header__eyebrow"><i class="fas fa-tag me-2"></i>Danh mục</span>
+            <h1 class="cat-header__title">@Model.CategoryName</h1>
+        </div>
+        <span class="cat-header__count">@products.Count() sản phẩm</span>
+    </div>
 
-<div>
-    <h4>Category</h4>
-    <hr />
-    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.CategoryName)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.CategoryName)
-        </dd>
-    </dl>
+    <!-- Body -->
+    @if (products.Any())
+    {
+        <div class="cat-card">
+            <div class="table-responsive">
+                <table class="table table-dark cat-table mb-0">
+                    <thead>
+                        <tr>
+                            <th><i class="fas fa-image me-2"></i>Hình ảnh</th>
+                            <th><i class="fas fa-box me-2"></i>Tên sản phẩm</th>
+                            <th class="text-end"><i class="fas fa-dollar-sign me-2"></i>Giá</th>
+                            <th class="text-center"><i class="fas fa-warehouse me-2"></i>Tồn kho</th>
+                            <th class="text-center"><i class="fas fa-toggle-on me-2"></i>Trạng thái</th>
+                            <th class="text-center"><i class="fas fa-cogs me-2"></i>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var product in products)
+                        {
+                            <tr>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(product.ImageUrl))
+                                    {
+                                        <img src="@product.ImageUrl" alt="@product.ProductName" class="cat-thumb" />
+                                    }
+                                    else
+                                    {
+                                        <div class="cat-thumb cat-thumb--empty"><i class="fas fa-image"></i></div>
+                                    }
+                                </td>
+                                <td>
+                                    <strong>@product.ProductName</strong>
+                                    @if (!string.IsNullOrEmpty(product.Description))
+                                    {
+                                        <br><small class="text-muted">@(product.Description.Length > 60 ? product.Description.Substring(0, 60) + "..." : product.Description)</small>
+                                    }
+                                </td>
+                                <td class="text-end fw-semibold">@product.Price.ToString("#,##0") ₫</td>
+                                <td class="text-center">
+                                    <span class="cat-chip @(product.Stock > 10 ? "cat-chip--success" : product.Stock > 0 ? "cat-chip--warning" : "cat-chip--danger")">
+                                        @product.Stock
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    @if (product.Status == true)
+                                    {
+                                        <span class="cat-chip cat-chip--success">Đang bán</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="cat-chip cat-chip--secondary">Ngừng bán</span>
+                                    }
+                                </td>
+                                <td class="text-center">
+                                    <a href="/Products/Details/@product.ProductId" class="btn btn-sm btn-outline-light" title="Xem sản phẩm">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="cat-empty">
+            <i class="fas fa-box-open cat-empty__icon"></i>
+            <h5 class="cat-empty__title">Chưa có sản phẩm nào thuộc danh mục này</h5>
+            <p class="cat-empty__text">Hãy thêm sản phẩm đầu tiên cho danh mục "@Model.CategoryName".</p>
+            <a href="/Products/Create" class="btn btn-outline-light">
+                <i class="fas fa-plus me-2"></i>Thêm sản phẩm mới
+            </a>
+        </div>
+    }
+
+    <!-- Footer -->
+    <div class="d-flex justify-content-between mt-4">
+        <a asp-action="Index" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Quay lại danh sách</a>
+        <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#editCategoryDetailModal">
+            <i class="fas fa-edit me-1"></i>Chỉnh sửa danh mục
+        </button>
+    </div>
 </div>
-<div>
-    <a asp-action="Edit" asp-route-id="@Model?.CategoryId">Edit</a> |
-    <a asp-action="Index">Back to List</a>
+
+<!-- Modal: Chỉnh sửa danh mục -->
+<div class="modal fade" id="editCategoryDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content cat-modal">
+            <form asp-action="Edit" asp-route-id="@Model.CategoryId" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="CategoryId" value="@Model.CategoryId" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Cập nhật danh mục #@Model.CategoryId</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit-detail-CategoryName" class="form-label">Tên danh mục</label>
+                        <input type="text" name="CategoryName" id="edit-detail-CategoryName" class="form-control"
+                               value="@Model.CategoryName" placeholder="Nhập tên danh mục..." required maxlength="100" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times me-1"></i>Hủy</button>
+                    <button type="submit" class="btn btn-warning"><i class="fas fa-save me-1"></i>Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<style>
+    .cat-details { color: var(--lux-white, #fff); }
+
+    /* Header */
+    .cat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 1rem;
+        padding-bottom: 1.25rem;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .cat-header__eyebrow {
+        display: inline-block;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        font-size: 0.75rem;
+        color: var(--lux-faint, #808080);
+        margin-bottom: 0.5rem;
+    }
+
+    .cat-header__title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 300;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--lux-white, #fff);
+        font-size: clamp(1.8rem, 4vw, 3rem);
+        margin: 0;
+    }
+
+    .cat-header__count {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.8rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--lux-muted, #b3b3b3);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25));
+        padding: 0.45rem 1rem;
+        white-space: nowrap;
+    }
+
+    /* Card bảng */
+    .cat-card {
+        background: var(--lux-surface, #111);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        border-radius: 0;
+        overflow: hidden;
+    }
+
+    .cat-table { color: var(--lux-white, #fff); margin: 0; }
+
+    .cat-table thead th {
+        background: transparent !important;
+        color: var(--lux-muted, #b3b3b3) !important;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.72rem;
+        padding: 1rem 0.75rem;
+    }
+
+    .cat-table tbody td {
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        border-bottom: 1px solid var(--lux-line-soft, rgba(255,255,255,0.06)) !important;
+        vertical-align: middle;
+        padding: 0.85rem 0.75rem;
+    }
+
+    .cat-table tbody tr:last-child td { border-bottom: none !important; }
+    .cat-table tbody tr:hover td { background: rgba(255,255,255,0.04) !important; }
+
+    .cat-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; background: #000; }
+    .cat-thumb--empty {
+        display: flex; align-items: center; justify-content: center;
+        color: var(--lux-faint, #808080);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .text-muted { color: var(--lux-muted, #b3b3b3) !important; }
+
+    /* Chip trạng thái / tồn kho */
+    .cat-chip {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.3rem 0.7rem;
+        border-radius: 999px;
+    }
+
+    .cat-chip--success { background: rgba(40,167,69,0.15); color: #5cd47a; border: 1px solid rgba(40,167,69,0.5); }
+    .cat-chip--warning { background: rgba(255,193,7,0.15); color: #ffc94d; border: 1px solid rgba(255,193,7,0.5); }
+    .cat-chip--danger { background: rgba(220,53,69,0.15); color: #ff7b87; border: 1px solid rgba(220,53,69,0.5); }
+    .cat-chip--secondary { background: rgba(255,255,255,0.08); color: #b3b3b3; border: 1px solid rgba(255,255,255,0.25); }
+
+    /* Empty state */
+    .cat-empty {
+        text-align: center;
+        padding: 4rem 2rem;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        background: var(--lux-surface, #111);
+    }
+
+    .cat-empty__icon { font-size: 3.5rem; color: var(--lux-faint, #808080); margin-bottom: 1.25rem; }
+    .cat-empty__title { color: var(--lux-white, #fff); font-weight: 300; text-transform: uppercase; letter-spacing: 0.08em; }
+    .cat-empty__text { color: var(--lux-muted, #b3b3b3); margin-bottom: 1.5rem; }
+
+    /* Modal đồng bộ */
+    .cat-modal {
+        background: var(--lux-bg, #0a0a0a) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        color: var(--lux-white, #fff) !important;
+    }
+    .cat-modal .modal-header { border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)); }
+    .cat-modal .modal-footer { border-top: 1px solid var(--lux-line, rgba(255,255,255,0.12)); }
+    .cat-modal .modal-title {
+        font-family: 'Montserrat', sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .cat-modal .form-label {
+        color: var(--lux-muted, #b3b3b3) !important;
+        font-family: 'Montserrat', sans-serif; text-transform: uppercase; letter-spacing: 0.1em;
+        font-size: 0.78rem; margin-bottom: 0.5rem;
+    }
+    .cat-modal .form-control {
+        background-color: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        color: var(--lux-white, #fff) !important;
+    }
+    .cat-modal .form-control::placeholder { color: var(--lux-faint, #808080) !important; }
+    .cat-modal .form-control:focus { border-color: var(--lux-white, #fff) !important; box-shadow: none !important; }
+</style>

@@ -2,94 +2,225 @@
 
 @{
     ViewData["Title"] = "Chi tiết sản phẩm";
+    var (stockLabel, stockCss) = Model.Stock > 10
+        ? ("Còn hàng", "pd-chip--success")
+        : Model.Stock > 0 ? ("Sắp hết", "pd-chip--warning") : ("Hết hàng", "pd-chip--danger");
 }
 
-<div class="crud-theme">
-    <div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h4 class="mb-0">Chi tiết sản phẩm</h4>
+<div class="pd container">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+        <h2 class="mb-0"><i class="fas fa-box-open me-2"></i>Chi tiết sản phẩm</h2>
+        <a href="/Products" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
+    </div>
+
+    <div class="pd-card">
+        <div class="row g-0">
+            <!-- Ảnh sản phẩm -->
+            <div class="col-lg-5">
+                <div class="pd-media">
+                    @if (!string.IsNullOrEmpty(Model.ImageUrl))
+                    {
+                        <img src="@Model.ImageUrl" alt="@Model.ProductName" class="pd-media__img" />
+                    }
+                    else
+                    {
+                        <div class="pd-media__empty">
+                            <i class="fas fa-image fa-3x mb-2"></i>
+                            <p class="mb-0">Chưa có hình ảnh</p>
+                        </div>
+                    }
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
+
+            <!-- Thông tin -->
+            <div class="col-lg-7">
+                <div class="pd-body">
+                    <span class="pd-category">@(Model.Category?.CategoryName ?? "Chưa phân loại")</span>
+                    <h3 class="pd-title">@Model.ProductName</h3>
+
+                    <div class="pd-price-row">
+                        <span class="pd-price">@Model.Price.ToString("#,##0") ₫</span>
+                        <span class="pd-chip @stockCss">@stockLabel · @Model.Stock</span>
+                    </div>
+
+                    <div class="pd-fields">
+                        <div class="pd-field">
+                            <span class="pd-field__label">Mã sản phẩm</span>
+                            <span class="pd-field__value">#@Model.ProductId</span>
+                        </div>
+                        <div class="pd-field">
+                            <span class="pd-field__label">Trạng thái</span>
+                            <span class="pd-field__value">
+                                @if (Model.Status == true)
+                                {
+                                    <span class="pd-chip pd-chip--success">Đang bán</span>
+                                }
+                                else
+                                {
+                                    <span class="pd-chip pd-chip--secondary">Ngừng bán</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="pd-field">
+                            <span class="pd-field__label">Tồn kho</span>
+                            <span class="pd-field__value">@Model.Stock sản phẩm</span>
+                        </div>
                         @if (!string.IsNullOrEmpty(Model.ImageUrl))
                         {
-                            <img src="@Model.ImageUrl" alt="@Model.ProductName" class="img-fluid rounded" style="max-height: 300px; object-fit: cover;">
-                        }
-                        else
-                        {
-                            <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height: 300px;">
-                                <div class="text-center">
-                                    <i class="fas fa-image fa-3x text-muted mb-2"></i>
-                                    <p class="text-muted">Chưa có hình ảnh</p>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                    <div class="col-md-8">
-                        <h3 class="text-primary">@Model.ProductName</h3>
-                        <p class="text-muted">@Model.Category.CategoryName</p>
-                        
-                        <div class="row mb-3">
-                            <div class="col-6">
-                                <h5 class="text-success">@Model.Price.ToString("N0") ₫</h5>
-                            </div>
-                            <div class="col-6">
-                                <span class="badge @(Model.Stock > 10 ? "bg-success" : Model.Stock > 0 ? "bg-warning" : "bg-danger") fs-6">
-                                    Tồn kho: @Model.Stock
+                            <div class="pd-field">
+                                <span class="pd-field__label">Hình ảnh</span>
+                                <span class="pd-field__value">
+                                    <a href="@Model.ImageUrl" target="_blank" class="pd-link">
+                                        <i class="fas fa-external-link-alt me-1"></i>Xem ảnh gốc
+                                    </a>
                                 </span>
                             </div>
-                        </div>
-
-                        @if (!string.IsNullOrEmpty(Model.Description))
-                        {
-                            <div class="mb-3">
-                                <h6>Mô tả:</h6>
-                                <p class="text-muted">@Model.Description</p>
-                            </div>
-                        }
-
-                        <div class="mb-3">
-                            <h6>Trạng thái:</h6>
-                            @if (Model.Status == true)
-                            {
-                                <span class="badge bg-success fs-6">Đang bán</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-secondary fs-6">Ngừng bán</span>
-                            }
-                        </div>
-
-                        @if (!string.IsNullOrEmpty(Model.ImageUrl))
-                        {
-                            <div class="mb-3">
-                                <h6>URL hình ảnh:</h6>
-                                <a href="@Model.ImageUrl" target="_blank" class="text-decoration-none">
-                                    <i class="fas fa-external-link-alt"></i> Xem hình ảnh gốc
-                                </a>
-                            </div>
                         }
                     </div>
-                </div>
 
-                <div class="d-flex justify-content-between mt-4">
-                    <a href="/Products" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Quay lại
-                    </a>
-                    <div>
-                        <a href="/Products/Edit/@Model.ProductId" class="btn btn-warning">
-                            <i class="fas fa-edit"></i> Sửa sản phẩm
-                        </a>
-                        <a href="/Products/Delete/@Model.ProductId" class="btn btn-danger">
-                            <i class="fas fa-trash"></i> Xóa sản phẩm
-                        </a>
-                    </div>
+                    @if (!string.IsNullOrEmpty(Model.Description))
+                    {
+                        <div class="pd-desc">
+                            <span class="pd-field__label">Mô tả</span>
+                            <p class="pd-desc__text">@Model.Description</p>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Hành động -->
+    <div class="d-flex justify-content-between mt-4">
+        <a href="/Products" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
+        <div class="d-flex gap-2">
+            <a href="/Products/Edit/@Model.ProductId" class="btn btn-warning"><i class="fas fa-edit me-1"></i>Sửa sản phẩm</a>
+            <a href="/Products/Delete/@Model.ProductId" class="btn btn-outline-danger"><i class="fas fa-trash me-1"></i>Xóa sản phẩm</a>
+        </div>
     </div>
 </div>
+
+<style>
+    .pd { color: var(--lux-white, #fff); }
+
+    .pd h2 { font-family: 'Montserrat', sans-serif; font-weight: 300; letter-spacing: 0.08em; }
+
+    .pd-card {
+        background: var(--lux-surface, #111);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    /* Ảnh */
+    .pd-media {
+        height: 100%;
+        min-height: 340px;
+        background: #0d0d0d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        border-right: 1px solid var(--lux-line, rgba(255,255,255,0.08));
+    }
+
+    .pd-media__img {
+        max-width: 100%;
+        max-height: 380px;
+        object-fit: contain;
+        border-radius: 4px;
+    }
+
+    .pd-media__empty {
+        text-align: center;
+        color: var(--lux-faint, #808080);
+    }
+
+    /* Thông tin */
+    .pd-body { padding: 2rem; }
+
+    .pd-category {
+        display: inline-block;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.72rem;
+        color: var(--lux-faint, #808080);
+        margin-bottom: 0.5rem;
+    }
+
+    .pd-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--lux-white, #fff);
+        font-size: 1.6rem;
+        line-height: 1.3;
+        margin-bottom: 1.25rem;
+    }
+
+    .pd-price-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding-bottom: 1.25rem;
+        margin-bottom: 1.25rem;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .pd-price {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 1.6rem;
+        color: var(--lux-white, #fff);
+    }
+
+    /* Chip trạng thái/tồn kho */
+    .pd-chip {
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.35rem 0.8rem;
+        border-radius: 999px;
+        white-space: nowrap;
+    }
+
+    .pd-chip--success { background: rgba(40,167,69,0.15); color: #5cd47a; border: 1px solid rgba(40,167,69,0.5); }
+    .pd-chip--warning { background: rgba(255,193,7,0.15); color: #ffc94d; border: 1px solid rgba(255,193,7,0.5); }
+    .pd-chip--danger { background: rgba(220,53,69,0.15); color: #ff7b87; border: 1px solid rgba(220,53,69,0.5); }
+    .pd-chip--secondary { background: rgba(255,255,255,0.08); color: #b3b3b3; border: 1px solid rgba(255,255,255,0.25); }
+
+    /* Hàng thông tin */
+    .pd-fields { display: flex; flex-direction: column; }
+
+    .pd-field {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .pd-field__label {
+        color: var(--lux-faint, #808080);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .pd-field__value { color: var(--lux-white, #fff); text-align: right; }
+
+    .pd-link { color: var(--lux-white, #fff); text-decoration: underline; }
+    .pd-link:hover { color: var(--lux-muted, #b3b3b3); }
+
+    /* Mô tả */
+    .pd-desc { margin-top: 1.25rem; }
+    .pd-desc__text {
+        color: var(--lux-muted, #b3b3b3);
+        margin-top: 0.5rem;
+        line-height: 1.7;
+    }
+</style>
