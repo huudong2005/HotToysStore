@@ -1,0 +1,149 @@
+<style>
+    /* ===== Staff - Dark Theme Luxury ===== */
+    .staff-card {
+        background: var(--lux-surface, #111) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .staff-card-header {
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        padding: 1.1rem 1.25rem;
+    }
+
+    .staff-card .card-body { color: var(--lux-white, #fff) !important; padding: 1.75rem; }
+
+    /* Form labels & inputs */
+    .staff-form-label {
+        color: var(--lux-muted, #b3b3b3) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.76rem;
+        margin-bottom: 0.4rem;
+    }
+
+    .staff-form-input,
+    .staff-form-select {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.14)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+        padding: 0.7rem 0.85rem;
+    }
+
+    .staff-form-input::placeholder { color: rgba(255,255,255,0.35) !important; }
+
+    .staff-form-input:focus,
+    .staff-form-select:focus {
+        background: transparent !important;
+        border-color: var(--lux-white, #fff) !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    /* Dropdown options dùng nền tối tránh chữ trắng trên nền trắng */
+    .staff-form-select option {
+        background-color: var(--lux-surface, #111) !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .staff-form-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.85rem center !important;
+        background-size: 16px 12px !important;
+    }
+
+    .staff-form-hint { color: var(--lux-muted, #b3b3b3) !important; font-size: 0.78rem; margin-top: 0.35rem; display: block; }
+
+    /* Validation */
+    .staff-card .text-danger { color: #f08a8a !important; font-size: 0.82rem; }
+    .staff-validation-summary { border-left: 2px solid #f08a8a; padding-left: 0.75rem; }
+
+    /* Buttons -> Ghost luxury */
+    .staff-btn {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25)) !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 0;
+        padding: 0.75rem 1.75rem;
+        transition: all 0.4s ease;
+    }
+
+    .staff-btn-ghost { color: var(--lux-muted, #b3b3b3) !important; }
+
+    .staff-btn-primary {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
+        border-color: var(--lux-white, #fff) !important;
+    }
+
+    .staff-btn-ghost:hover,
+    .staff-btn-primary:hover {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
+        border-color: var(--lux-white, #fff) !important;
+    }
+
+    .staff-btn-primary:hover { background: transparent !important; color: var(--lux-white, #fff) !important; }
+
+    /* Details profile */
+    .staff-avatar {
+        width: 84px; height: 84px;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25));
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--lux-white, #fff);
+        font-size: 1.9rem;
+    }
+
+    .staff-profile-name {
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+    }
+
+    .staff-role-badge {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.3)) !important;
+        color: var(--lux-muted, #b3b3b3) !important;
+        border-radius: 0 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .staff-divider { border-color: var(--lux-line, rgba(255,255,255,0.12)) !important; }
+
+    .staff-info-row {
+        padding: 0.85rem 0;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.06));
+    }
+
+    .staff-info-label {
+        color: var(--lux-muted, #b3b3b3) !important;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.78rem;
+    }
+
+    .staff-info-value { color: var(--lux-white, #fff) !important; font-weight: 500; }
+</style>

@@ -152,7 +152,7 @@ namespace ToyStore.Controllers
                 return NotFound();
             }
             var customers = await _unitOfWork.Customers.GetAllAsync();
-            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "CustomerId", order.CustomerId);
+            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "FullName", order.CustomerId);
             return View(order);
         }
 
@@ -167,6 +167,11 @@ namespace ToyStore.Controllers
             {
                 return NotFound();
             }
+
+            // Bỏ validate các navigation không submit từ form (tránh lỗi "required" do non-nullable
+            // reference type khiến ModelState không hợp lệ -> nút Lưu không hoạt động).
+            ModelState.Remove("Customer");
+            ModelState.Remove("OrderDetails");
 
             if (ModelState.IsValid)
             {
@@ -205,7 +210,7 @@ namespace ToyStore.Controllers
                 return RedirectToAction(nameof(Index));
             }
             var customers = await _unitOfWork.Customers.GetAllAsync();
-            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "CustomerId", order.CustomerId);
+            ViewData["CustomerId"] = new SelectList(customers, "CustomerId", "FullName", order.CustomerId);
             return View(order);
         }
 
@@ -366,10 +371,136 @@ namespace ToyStore.Controllers
             }
         }
 
+        // Tập trạng thái chuẩn (tiếng Việt) dùng cho vòng đời đơn hàng.
+        private const string StatusPending = "Chờ xác nhận";
+        private const string StatusConfirmed = "Đã xác nhận";
+        private const string StatusShipping = "Đang giao hàng";
+        private const string StatusCompleted = "Hoàn thành";
+        private const string StatusCancelled = "Đã hủy";
+
+        // POST: Orders/UpdateStatus
+        // Cập nhật trạng thái đơn hàng theo lựa chọn của Admin. Khi chuyển sang "Hoàn thành"
+        // sẽ tự động tăng số đơn hoàn thành & xét thăng hạng thành viên.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateStatus(int orderId, string newStatus)
+        {
+            try
+            {
+                // Chuẩn hóa & kiểm tra trạng thái hợp lệ (chống dữ liệu rác gửi lên).
+                var normalizedNew = NormalizeStatus(newStatus);
+                if (!IsValidStatus(normalizedNew))
+                {
+                    TempData["ErrorMessage"] = "Trạng thái không hợp lệ.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+                if (order == null)
+                {
+                    TempData["ErrorMessage"] = "Đơn hàng không tồn tại.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var oldStatus = NormalizeStatus(order.Status);
+
+                // Không có gì thay đổi -> báo nhẹ và quay lại.
+                if (string.Equals(oldStatus, normalizedNew, StringComparison.Ordinal))
+                {
+                    TempData["SuccessMessage"] = $"Đơn hàng #{order.OrderId} đã ở trạng thái \"{normalizedNew}\".";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Bọc trong transaction để cập nhật trạng thái + thăng hạng là nguyên tử.
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    order.Status = normalizedNew;
+                    _unitOfWork.Orders.Update(order);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    // LOGIC HẠNG THÀNH VIÊN: chỉ kích hoạt khi chuyển SANG "Hoàn thành"
+                    // và trạng thái cũ chưa phải là "Hoàn thành" (tránh cộng trùng).
+                    if (normalizedNew == StatusCompleted && oldStatus != StatusCompleted)
+                    {
+                        await UpdateMembershipProgressAsync(order.CustomerId);
+                    }
+
+                    await _unitOfWork.CommitTransactionAsync();
+                }
+                catch
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    throw;
+                }
+
+                TempData["SuccessMessage"] = $"Đã cập nhật đơn hàng #{order.OrderId} sang trạng thái \"{normalizedNew}\".";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = "Lỗi khi cập nhật trạng thái: " + ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        // Kiểm tra trạng thái có nằm trong tập chuẩn hay không.
+        private static bool IsValidStatus(string? status)
+        {
+            return status is StatusPending or StatusConfirmed or StatusShipping or StatusCompleted or StatusCancelled;
+        }
+
+        // Chuẩn hóa trạng thái: gộp cả nhãn tiếng Anh (legacy) lẫn tiếng Việt về một bộ chuẩn tiếng Việt.
+        private static string NormalizeStatus(string? status)
+        {
+            var s = (status ?? string.Empty).Trim();
+            return s switch
+            {
+                "Pending" or "Chờ xác nhận" => StatusPending,
+                "Confirmed" or "Đã xác nhận" => StatusConfirmed,
+                "Shipped" or "Shipping" or "Đang giao" or "Đang giao hàng" => StatusShipping,
+                "Completed" or "Hoàn thành" => StatusCompleted,
+                "Cancelled" or "Canceled" or "Đã hủy" => StatusCancelled,
+                _ => s
+            };
+        }
+
         private async Task<bool> OrderExists(int id)
         {
             var order = await _unitOfWork.Orders.GetByIdAsync(id);
             return order != null;
+        }
+
+        /// <summary>
+        /// Tăng số đơn hoàn thành của khách thêm 1 và xét tự động thăng hạng thành viên.
+        /// Gọi sau khi đơn hàng được giao thành công (trạng thái Shipped / "Hoàn thành").
+        /// </summary>
+        private async Task UpdateMembershipProgressAsync(int customerId)
+        {
+            // Null checking: khách có thể không tồn tại (dữ liệu lỗi) -> bỏ qua an toàn.
+            var customer = await _unitOfWork.Customers.GetByIdAsync(customerId);
+            if (customer == null)
+            {
+                return;
+            }
+
+            // Tăng tổng số đơn đã hoàn thành.
+            customer.TotalCompletedOrders += 1;
+
+            // Lấy danh sách hạng thẻ (xếp theo RequiredOrders giảm dần) để tìm hạng cao nhất đủ điều kiện.
+            var tiers = await _unitOfWork.MembershipTiers.GetAllOrderedByRequiredOrdersDescAsync();
+
+            // Hạng phù hợp = hạng có RequiredOrders cao nhất mà khách đã đạt được.
+            var qualifiedTier = tiers?
+                .FirstOrDefault(t => customer.TotalCompletedOrders >= t.RequiredOrders);
+
+            if (qualifiedTier != null && customer.TierId != qualifiedTier.TierId)
+            {
+                customer.TierId = qualifiedTier.TierId;
+            }
+
+            _unitOfWork.Customers.Update(customer);
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 }

@@ -20,6 +20,7 @@ public class UnitOfWork : IUnitOfWork
     private IAdminRepository? _admins;
     private IPromotionRepository? _promotions;
     private IBannerRepository? _banners;
+    private IMembershipTierRepository? _membershipTiers;
     private IGenericRepository<Cart>? _carts;
     private IGenericRepository<CartItem>? _cartItems;
 
@@ -97,6 +98,15 @@ public class UnitOfWork : IUnitOfWork
         {
             _banners ??= new BannerRepository(_context);
             return _banners;
+        }
+    }
+
+    public IMembershipTierRepository MembershipTiers
+    {
+        get
+        {
+            _membershipTiers ??= new MembershipTierRepository(_context);
+            return _membershipTiers;
         }
     }
 

@@ -160,6 +160,8 @@
                                 <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
                                     <li><span class="dropdown-item-text user-type">@Context.Session.GetString("UserType")</span></li>
                                     <li><hr class="dropdown-divider"></li>
+                                    @* Huy hiệu hạng thành viên: chỉ hiển thị cho khách hàng đã đạt hạng thẻ *@
+                                    @await Component.InvokeAsync("MembershipStatus")
                                     @if (Context.Session.GetString("UserType") == "Customer")
                                     {
                                         <li>

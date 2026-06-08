@@ -1,41 +1,55 @@
 @model ToyStore.Domain.Entities.Admin
 @{
     ViewData["Title"] = "Chi tiết nhân viên";
+    var isAdmin = Model.Role == "Admin";
 }
 
 <div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h4 class="mb-0">Chi tiết nhân viên</h4>
+    <div class="col-lg-7 col-md-9">
+        <div class="card staff-card">
+            <div class="card-header staff-card-header">
+                <h4 class="mb-0"><i class="fas fa-id-badge me-2"></i>Chi tiết nhân viên</h4>
             </div>
             <div class="card-body">
-                <dl class="row">
-                    <dt class="col-sm-3">ID:</dt>
-                    <dd class="col-sm-9">@Model.AdminId</dd>
+                <div class="staff-profile text-center mb-4">
+                    <div class="staff-avatar mx-auto mb-3">
+                        <i class="fas @(isAdmin ? "fa-crown" : "fa-user-tie")"></i>
+                    </div>
+                    <h3 class="staff-profile-name mb-1">@Model.FullName</h3>
+                    <span class="badge staff-role-badge @(isAdmin ? "role-admin" : "role-staff")">
+                        <i class="fas @(isAdmin ? "fa-crown" : "fa-user-tie") me-1"></i>@Model.Role
+                    </span>
+                </div>
 
-                    <dt class="col-sm-3">Họ tên:</dt>
-                    <dd class="col-sm-9">@Model.FullName</dd>
+                <hr class="staff-divider">
 
-                    <dt class="col-sm-3">Username:</dt>
-                    <dd class="col-sm-9">@Model.Username</dd>
+                <div class="staff-info-row d-flex justify-content-between align-items-center">
+                    <span class="staff-info-label"><i class="fas fa-hashtag me-2"></i>Mã nhân viên</span>
+                    <span class="staff-info-value">#@Model.AdminId</span>
+                </div>
+                <div class="staff-info-row d-flex justify-content-between align-items-center">
+                    <span class="staff-info-label"><i class="fas fa-user me-2"></i>Họ tên</span>
+                    <span class="staff-info-value">@Model.FullName</span>
+                </div>
+                <div class="staff-info-row d-flex justify-content-between align-items-center">
+                    <span class="staff-info-label"><i class="fas fa-at me-2"></i>Username</span>
+                    <span class="staff-info-value">@Model.Username</span>
+                </div>
+                <div class="staff-info-row d-flex justify-content-between align-items-center">
+                    <span class="staff-info-label"><i class="fas fa-user-shield me-2"></i>Vai trò</span>
+                    <span class="staff-info-value">@Model.Role</span>
+                </div>
 
-                    <dt class="col-sm-3">Vai trò:</dt>
-                    <dd class="col-sm-9">
-                        <span class="badge @(Model.Role == "Admin" ? "bg-danger" : "bg-primary")">
-                            @Model.Role
-                        </span>
-                    </dd>
-                </dl>
-
-                <div class="d-flex justify-content-between">
-                    <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
-                    <div>
-                        <a asp-action="Edit" asp-route-id="@Model.AdminId" class="btn btn-warning">
-                            <i class="fas fa-edit"></i> Sửa
+                <div class="d-flex justify-content-between staff-actions mt-4">
+                    <a asp-action="Index" class="btn staff-btn staff-btn-ghost">
+                        <i class="fas fa-arrow-left me-2"></i>Quay lại
+                    </a>
+                    <div class="d-flex gap-2">
+                        <a asp-action="Edit" asp-route-id="@Model.AdminId" class="btn staff-btn staff-btn-ghost">
+                            <i class="fas fa-edit me-2"></i>Sửa
                         </a>
-                        <a asp-action="Delete" asp-route-id="@Model.AdminId" class="btn btn-danger">
-                            <i class="fas fa-trash"></i> Xóa
+                        <a asp-action="Delete" asp-route-id="@Model.AdminId" class="btn staff-btn staff-btn-ghost">
+                            <i class="fas fa-trash me-2"></i>Xóa
                         </a>
                     </div>
                 </div>
@@ -44,7 +58,4 @@
     </div>
 </div>
 
-
-
-
-
+<partial name="_StaffFormStyles" />

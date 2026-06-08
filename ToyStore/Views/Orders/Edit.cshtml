@@ -1,7 +1,7 @@
 @model ToyStore.Domain.Entities.Order
 
 @{
-    ViewData["Title"] = "Edit";
+    ViewData["Title"] = "Sửa đơn hàng";
 }
 
 <div class="crud-theme">
@@ -15,51 +15,75 @@
                     <form asp-action="Edit">
                         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
                         <input type="hidden" asp-for="OrderId" />
+
                         <div class="mb-3">
-                            <label asp-for="CustomerId" class="form-label"></label>
+                            <label asp-for="CustomerId" class="form-label">Khách hàng</label>
                             <select asp-for="CustomerId" class="form-select" asp-items="ViewBag.CustomerId"></select>
                             <span asp-validation-for="CustomerId" class="text-danger"></span>
                         </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label asp-for="OrderDate" class="form-label"></label>
-                                    <input asp-for="OrderDate" class="form-control" />
+                                    <label asp-for="OrderDate" class="form-label">Ngày đặt hàng</label>
+                                    <input asp-for="OrderDate" class="form-control" readonly />
                                     <span asp-validation-for="OrderDate" class="text-danger"></span>
                                 </div>
                             </div>
+
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label asp-for="TotalAmount" class="form-label"></label>
-                                    <input asp-for="TotalAmount" class="form-control" />
+                                    <label asp-for="TotalAmount" class="form-label">Tổng tiền (VNĐ)</label>
+                                    <input asp-for="TotalAmount" class="form-control" type="number" step="0.01" />
                                     <span asp-validation-for="TotalAmount" class="text-danger"></span>
                                 </div>
                             </div>
                         </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label asp-for="Status" class="form-label"></label>
-                                    <input asp-for="Status" class="form-control" />
+                                    <label asp-for="Status" class="form-label">Trạng thái đơn hàng</label>
+                                    <select asp-for="Status" class="form-select">
+                                        <option value="Chờ xác nhận">Chờ xác nhận</option>
+                                        <option value="Đã xác nhận">Đã xác nhận</option>
+                                        <option value="Đang giao hàng">Đang giao hàng</option>
+                                        <option value="Hoàn thành">Hoàn thành</option>
+                                        <option value="Đã hủy">Đã hủy</option>
+                                    </select>
                                     <span asp-validation-for="Status" class="text-danger"></span>
                                 </div>
                             </div>
+
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label asp-for="PaymentMethod" class="form-label"></label>
-                                    <input asp-for="PaymentMethod" class="form-control" />
+                                    <label asp-for="PaymentMethod" class="form-label">Phương thức thanh toán</label>
+                                    <select asp-for="PaymentMethod" class="form-select">
+                                        <option value="COD">Thanh toán khi nhận hàng (COD)</option>
+                                        <option value="VNPAY">Thanh toán qua VNPAY</option>
+                                        <option value="BankTransfer">Chuyển khoản ngân hàng</option>
+                                    </select>
                                     <span asp-validation-for="PaymentMethod" class="text-danger"></span>
                                 </div>
                             </div>
                         </div>
+
                         <div class="mb-3">
-                            <label asp-for="DeliveryMethod" class="form-label"></label>
-                            <input asp-for="DeliveryMethod" class="form-control" />
+                            <label asp-for="DeliveryMethod" class="form-label">Phương thức giao hàng</label>
+                            <select asp-for="DeliveryMethod" class="form-select">
+                                <option value="Standard">Giao hàng tiêu chuẩn (Standard)</option>
+                                <option value="Express">Giao hàng hỏa tốc (Express)</option>
+                            </select>
                             <span asp-validation-for="DeliveryMethod" class="text-danger"></span>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <a asp-action="Index" class="btn btn-secondary">Quay lại</a>
-                            <button type="submit" class="btn btn-warning"><i class="fas fa-save me-1"></i>Lưu thay đổi</button>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Quay lại
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Lưu thay đổi
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -68,3 +92,25 @@
     </div>
 </div>
 
+<style>
+    /* Fix lỗi chữ trắng nền trắng cho các dropdown trong giao diện Dark Theme */
+    select.form-select option {
+        background-color: #1a1d24 !important; /* Màu nền xám đen sang trọng */
+        color: #ffffff !important; /* Chữ màu trắng */
+    }
+
+    select.form-select:focus {
+        background-color: transparent !important;
+        color: #ffffff !important;
+        border-color: var(--lux-white, #fff);
+        box-shadow: none;
+    }
+    /* Fix lỗi nền trắng của thẻ input readonly/disabled trong Dark Theme */
+    input.form-control[readonly],
+    input.form-control:disabled {
+        background-color: rgba(255, 255, 255, 0.05) !important; /* Nền xám mờ tinh tế */
+        color: #b3b3b3 !important; /* Chữ xám nhạt để báo hiệu trường này không được sửa */
+        border-color: rgba(255, 255, 255, 0.12) !important;
+        cursor: not-allowed; /* Con trỏ chuột hình dấu cấm */
+    }
+</style>

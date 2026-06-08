@@ -4,6 +4,23 @@
     ViewData["Title"] = "Quản lý đơn hàng";
 }
 
+@functions {
+    // Chuẩn hóa trạng thái: gộp nhãn tiếng Anh (legacy) và tiếng Việt về một bộ chuẩn tiếng Việt.
+    static string NormalizeStatus(string? status)
+    {
+        var s = (status ?? string.Empty).Trim();
+        return s switch
+        {
+            "Pending" or "Chờ xác nhận" => "Chờ xác nhận",
+            "Confirmed" or "Đã xác nhận" => "Đã xác nhận",
+            "Shipped" or "Shipping" or "Đang giao" or "Đang giao hàng" => "Đang giao hàng",
+            "Completed" or "Hoàn thành" => "Hoàn thành",
+            "Cancelled" or "Canceled" or "Đã hủy" => "Đã hủy",
+            _ => s
+        };
+    }
+}
+
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-shopping-bag"></i> Quản lý đơn hàng</h2>
@@ -71,6 +88,9 @@
                         <tbody>
                             @foreach (var item in Model)
                             {
+                                var currentStatus = NormalizeStatus(item.Status);
+                                bool isLocked = currentStatus == "Hoàn thành" || currentStatus == "Đã hủy";
+                                var statusOptions = new[] { "Chờ xác nhận", "Đã xác nhận", "Đang giao hàng", "Hoàn thành", "Đã hủy" };
                                 <tr>
                                     <td>
                                         <span class="badge bg-primary fs-6">#@item.OrderId</span>
@@ -102,66 +122,66 @@
                                     </td>
                                     <td>
                                         @{
-                                            string statusClass = item.Status switch
+                                            string statusClass = currentStatus switch
                                             {
-                                                "Pending" => "bg-warning",
-                                                "Confirmed" => "bg-success",
-                                                "Cancelled" => "bg-danger",
-                                                "Completed" => "bg-info",
+                                                "Chờ xác nhận" => "bg-warning",
+                                                "Đã xác nhận" => "bg-success",
+                                                "Đang giao hàng" => "bg-primary",
+                                                "Hoàn thành" => "bg-info",
+                                                "Đã hủy" => "bg-danger",
                                                 _ => "bg-secondary"
                                             };
-                                            string statusText = item.Status switch
+                                            string statusIcon = currentStatus switch
                                             {
-                                                "Pending" => "Chờ xác nhận",
-                                                "Confirmed" => "Đã xác nhận",
-                                                "Cancelled" => "Đã hủy",
-                                                "Completed" => "Hoàn thành",
-                                                _ => item.Status
-                                            };
-                                            string statusIcon = item.Status switch
-                                            {
-                                                "Pending" => "fas fa-clock",
-                                                "Confirmed" => "fas fa-check-circle",
-                                                "Cancelled" => "fas fa-times-circle",
-                                                "Completed" => "fas fa-check-double",
+                                                "Chờ xác nhận" => "fas fa-clock",
+                                                "Đã xác nhận" => "fas fa-check-circle",
+                                                "Đang giao hàng" => "fas fa-truck",
+                                                "Hoàn thành" => "fas fa-check-double",
+                                                "Đã hủy" => "fas fa-times-circle",
                                                 _ => "fas fa-question-circle"
                                             };
                                         }
                                         <span class="badge @statusClass">
-                                            <i class="@statusIcon me-1"></i>@statusText
+                                            <i class="@statusIcon me-1"></i>@currentStatus
                                         </span>
                                     </td>
                                     <td>
                                         <span class="badge bg-primary">@item.PaymentMethod</span>
                                     </td>
                                     <td>
-                                        <div class="btn-group" role="group">
-                                            <a asp-action="Details" asp-route-id="@item.OrderId" class="btn btn-info btn-sm" title="Xem chi tiết">
+                                        <div class="d-flex align-items-center gap-2 order-actions">
+                                            <form asp-action="UpdateStatus" method="post" class="d-flex align-items-center gap-2 mb-0 status-update-form">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="orderId" value="@item.OrderId" />
+                                                <select name="newStatus" class="form-select form-select-sm bg-dark text-white border-secondary status-select"
+                                                        @(isLocked ? "disabled" : "")>
+                                                    @foreach (var opt in statusOptions)
+                                                    {
+                                                        if (opt == currentStatus)
+                                                        {
+                                                            <option value="@opt" selected>@opt</option>
+                                                        }
+                                                        else
+                                                        {
+                                                            <option value="@opt">@opt</option>
+                                                        }
+                                                    }
+                                                </select>
+                                                <button type="submit" class="btn btn-sm btn-outline-light" title="Lưu trạng thái"
+                                                        @(isLocked ? "disabled" : "")>
+                                                    <i class="fas fa-save"></i>
+                                                </button>
+                                            </form>
+
+                                            <a asp-action="Details" asp-route-id="@item.OrderId" class="btn btn-sm btn-outline-light" title="Xem chi tiết">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            
-                                            @if (item.Status == "Pending")
-                                            {
-                                                <form asp-action="Confirm" asp-route-id="@item.OrderId" method="post" class="d-inline">
-                                                    <button type="submit" class="btn btn-success btn-sm" title="Xác nhận đơn hàng" 
-                                                            onclick="return confirm('Bạn có chắc chắn muốn xác nhận đơn hàng #@item.OrderId?')">
-                                                        <i class="fas fa-check"></i>
-                                                    </button>
-                                                </form>
-                                                
-                                                <form asp-action="Cancel" asp-route-id="@item.OrderId" method="post" class="d-inline">
-                                                    <button type="submit" class="btn btn-danger btn-sm" title="Hủy đơn hàng"
-                                                            onclick="return confirm('Bạn có chắc chắn muốn hủy đơn hàng #@item.OrderId?')">
-                                                        <i class="fas fa-times"></i>
-                                                    </button>
-                                                </form>
-                                            }
-                                            
-                                            <a asp-action="Edit" asp-route-id="@item.OrderId" class="btn btn-warning btn-sm" title="Chỉnh sửa">
+
+                                            <a asp-action="Edit" asp-route-id="@item.OrderId" class="btn btn-sm btn-outline-light" title="Chỉnh sửa">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            
-                                            <a asp-action="Delete" asp-route-id="@item.OrderId" class="btn btn-danger btn-sm" title="Xóa">
+
+                                            <a asp-action="Delete" asp-route-id="@item.OrderId" class="btn btn-sm btn-outline-light" title="Xóa">
                                                 <i class="fas fa-trash"></i>
                                             </a>
                                         </div>
@@ -223,6 +243,48 @@
 
     .btn-group .btn { margin-right: 4px; }
     .btn-group .btn:last-child { margin-right: 0; }
+
+    /* ===== Cập nhật trạng thái đơn hàng (giữ bố cục gọn, không xô lệch cột) ===== */
+    .order-actions { flex-wrap: nowrap; }
+
+    .order-actions .status-update-form { flex-wrap: nowrap; }
+
+    /* Select trạng thái: nền tối, viền mờ, bề rộng cố định để cột không bị giãn. */
+    .status-select {
+        background-color: var(--lux-bg, #0a0a0a) !important;
+        color: var(--lux-white, #fff) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25)) !important;
+        border-radius: 0 !important;
+        min-width: 150px;
+        width: auto;
+        font-family: 'Montserrat', sans-serif;
+        letter-spacing: 0.04em;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.6rem center !important;
+        background-size: 14px 11px !important;
+    }
+
+    .status-select:focus {
+        background-color: var(--lux-bg, #0a0a0a) !important;
+        border-color: var(--lux-white, #fff) !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    /* Sửa lỗi chữ trắng trên nền trắng khi xổ danh sách option. */
+    .status-select option {
+        background-color: var(--lux-surface, #111) !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .status-select:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    /* Nút trong khu thao tác: gọn, không bị margin của btn-group cũ kéo lệch. */
+    .order-actions .btn { margin: 0; padding: 0.35rem 0.6rem; }
 
     .card {
         background: var(--lux-surface, #111) !important;

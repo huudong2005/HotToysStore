@@ -69,6 +69,12 @@ namespace ToyStore.Services
                 await _context.SaveChangesAsync();
             }
 
+            // Tài khoản bị khóa — không cấp phiên đăng nhập.
+            if (customer.IsLocked)
+            {
+                return null;
+            }
+
             return new UserSession
             {
                 UserId = customer.CustomerId,

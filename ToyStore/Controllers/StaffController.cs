@@ -36,6 +36,18 @@ namespace ToyStore.Controllers
             return View(staff);
         }
 
+        // GET: Staff/Details/5
+        public async Task<IActionResult> Details(int id)
+        {
+            var staff = await _context.Admins.FindAsync(id);
+            if (staff == null)
+            {
+                TempData["ErrorMessage"] = "Không tìm thấy tài khoản nhân viên.";
+                return RedirectToAction("Index");
+            }
+            return View(staff);
+        }
+
         // GET: Staff/Create
         public IActionResult Create()
         {
@@ -99,6 +111,14 @@ namespace ToyStore.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, CreateStaffViewModel model)
         {
+            // Khi sửa nhân viên, mật khẩu là tùy chọn: để trống nghĩa là giữ nguyên mật khẩu cũ.
+            // Vì vậy bỏ qua lỗi validation của Password/ConfirmPassword nếu admin không nhập gì.
+            if (string.IsNullOrWhiteSpace(model.Password) && string.IsNullOrWhiteSpace(model.ConfirmPassword))
+            {
+                ModelState.Remove(nameof(model.Password));
+                ModelState.Remove(nameof(model.ConfirmPassword));
+            }
+
             if (!ModelState.IsValid) return View(model);
 
             try

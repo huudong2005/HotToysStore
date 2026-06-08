@@ -25,6 +25,13 @@ public class CustomerRepository : GenericRepository<Customer>, ICustomerReposito
             .CountAsync(c => c.Email == email) > 0;
     }
 
+    public async Task<Customer?> GetCustomerWithTierAsync(int customerId)
+    {
+        return await _dbSet
+            .Include(c => c.Tier)
+            .FirstOrDefaultAsync(c => c.CustomerId == customerId);
+    }
+
     public async Task CreateCustomerViaProcedureAsync(Customer customer)
     {
         var p_FullName = new OracleParameter("p_FullName", OracleDbType.Varchar2, 100)

@@ -177,6 +177,68 @@
     .input-group:focus-within .password-toggle-btn {
         border-color: #ffffff;
     }
+
+    /* ===== Trạng thái hạng thành viên ===== */
+    .membership-status {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 0;
+        background: transparent;
+        padding: 1.25rem 1.5rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .membership-status--member {
+        border-left: 2px solid #f5d272;
+    }
+
+    .membership-status--regular {
+        border-left: 2px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .membership-status__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.85rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .membership-status__label {
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #b3b3b3;
+    }
+
+    .membership-status__label i { margin-right: 8px; }
+
+    .membership-status__tier {
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #f5d272;
+        border: 1px solid rgba(245, 210, 114, 0.5);
+        padding: 0.25rem 0.7rem;
+    }
+
+    .membership-status__tier--regular {
+        color: #b3b3b3;
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .membership-status__text { color: #ffffff; }
+    .membership-status__meta,
+    .membership-status__next { color: #b3b3b3; margin-top: 0.4rem; }
+    .membership-status__meta i,
+    .membership-status__next i { margin-right: 6px; color: #b3b3b3; }
+    .membership-status .text-success { color: #4ade80 !important; }
 </style>
 
 <div class="container mt-4 mb-5">
@@ -196,6 +258,68 @@
                             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     }
+
+                    @{
+                        bool hasTier = ViewBag.HasTier ?? false;
+                        string? tierName = ViewBag.TierName as string;
+                        decimal discountPercent = ViewBag.DiscountPercent ?? 0m;
+                        int totalCompletedOrders = ViewBag.TotalCompletedOrders ?? 0;
+                        string? nextTierName = ViewBag.NextTierName as string;
+                        int ordersToNextTier = ViewBag.OrdersToNextTier ?? 0;
+                    }
+
+                    <div class="membership-status @(hasTier ? "membership-status--member" : "membership-status--regular")">
+                        <div class="membership-status__head">
+                            <div class="membership-status__label">
+                                <i class="fas @(hasTier ? "fa-crown" : "fa-user")"></i>
+                                Trạng thái tài khoản
+                            </div>
+                            @if (hasTier)
+                            {
+                                <span class="membership-status__tier">@tierName · Ưu đãi @discountPercent.ToString("0.##")%</span>
+                            }
+                            else
+                            {
+                                <span class="membership-status__tier membership-status__tier--regular">Tài khoản thường</span>
+                            }
+                        </div>
+
+                        <div class="membership-status__body">
+                            @if (hasTier)
+                            {
+                                <p class="membership-status__text mb-1">
+                                    Bạn đang là thành viên <strong>@tierName</strong>, được giảm
+                                    <strong class="text-success">@discountPercent.ToString("0.##")%</strong> cho mỗi đơn hàng.
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="membership-status__text mb-1">
+                                    Bạn chưa đạt hạng thành viên nào. Hãy mua sắm nhiều hơn để nhận ưu đãi hấp dẫn!
+                                </p>
+                            }
+
+                            <p class="membership-status__meta mb-0">
+                                <i class="fas fa-box-open"></i>
+                                Số đơn đã hoàn thành: <strong>@totalCompletedOrders</strong>
+                            </p>
+
+                            @if (!string.IsNullOrEmpty(nextTierName) && ordersToNextTier > 0)
+                            {
+                                <p class="membership-status__next mb-0">
+                                    <i class="fas fa-arrow-trend-up"></i>
+                                    Còn <strong>@ordersToNextTier</strong> đơn nữa để lên hạng <strong>@nextTierName</strong>.
+                                </p>
+                            }
+                            else if (hasTier)
+                            {
+                                <p class="membership-status__next mb-0">
+                                    <i class="fas fa-award"></i>
+                                    Bạn đang ở hạng thành viên cao nhất. Cảm ơn bạn đã đồng hành!
+                                </p>
+                            }
+                        </div>
+                    </div>
 
                     <form asp-action="MyProfile" method="post" autocomplete="off">
                         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>

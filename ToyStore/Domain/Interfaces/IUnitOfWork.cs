@@ -14,6 +14,7 @@ public interface IUnitOfWork : IDisposable
     IAdminRepository Admins { get; }
     IPromotionRepository Promotions { get; }
     IBannerRepository Banners { get; }
+    IMembershipTierRepository MembershipTiers { get; }
     IGenericRepository<Cart> Carts { get; }
     IGenericRepository<CartItem> CartItems { get; }
     

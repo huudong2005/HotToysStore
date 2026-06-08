@@ -34,6 +34,11 @@ public partial class Order
     /// </summary>
     public decimal Subtotal { get; set; }
 
+    /// <summary>
+    /// Số tiền giảm theo ưu đãi hạng thẻ thành viên (xếp chồng với khuyến mãi/voucher).
+    /// </summary>
+    public decimal MembershipDiscountValue { get; set; } = 0;
+
     public virtual Customer Customer { get; set; } = null!;
 
     public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();

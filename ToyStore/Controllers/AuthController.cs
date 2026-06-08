@@ -11,17 +11,20 @@ namespace ToyStore.Controllers
         private readonly IAuthService _authService;
         private readonly ISessionService _sessionService;
         private readonly ICartStorageService _cartStorage;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<AuthController> _logger;
 
         public AuthController(
             IAuthService authService,
             ISessionService sessionService,
             ICartStorageService cartStorage,
+            IUnitOfWork unitOfWork,
             ILogger<AuthController> logger)
         {
             _authService = authService;
             _sessionService = sessionService;
             _cartStorage = cartStorage;
+            _unitOfWork = unitOfWork;
             _logger = logger;
         }
 
@@ -51,13 +54,27 @@ namespace ToyStore.Controllers
                 
                 // Thử đăng nhập Customer trước
                 userSession = await _authService.LoginAsync(model.EmailOrUsername, model.Password, "Customer");
-                
+
+                // Mật khẩu đúng nhưng tài khoản bị khóa -> thông báo riêng (không thử Admin).
+                if (userSession == null)
+                {
+                    var customer = await _unitOfWork.Customers.GetCustomerByEmailAsync(model.EmailOrUsername);
+                    if (customer != null
+                        && _authService.VerifyPassword(model.Password, customer.PasswordHash)
+                        && customer.IsLocked)
+                    {
+                        ModelState.AddModelError(string.Empty,
+                            "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.");
+                        return View(model);
+                    }
+                }
+
                 // Nếu không thành công, thử Admin/Staff
                 if (userSession == null)
                 {
                     userSession = await _authService.LoginAsync(model.EmailOrUsername, model.Password, "Admin");
                 }
-                
+
                 if (userSession == null)
                 {
                     ModelState.AddModelError("", "Email/Username hoặc mật khẩu không đúng");

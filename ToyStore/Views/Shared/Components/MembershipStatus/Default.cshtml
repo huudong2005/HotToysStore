@@ -1,0 +1,36 @@
+@model ToyStore.Domain.Entities.MembershipTier
+
+@if (Model != null)
+{
+    <li>
+        <span class="dropdown-item-text membership-badge">
+            <i class="fas fa-crown membership-badge__icon"></i>
+            <span class="membership-badge__name">@Model.TierName</span>
+            <span class="membership-badge__discount">- @Model.DiscountPercent.ToString("0.##")%</span>
+        </span>
+    </li>
+    <li><hr class="dropdown-divider"></li>
+
+    <style>
+        .membership-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'Montserrat', sans-serif;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            color: #f5d272 !important;
+        }
+
+        .membership-badge__icon { color: #f5d272 !important; }
+
+        .membership-badge__name { font-weight: 600; }
+
+        .membership-badge__discount {
+            margin-left: auto;
+            color: #4ade80 !important;
+            font-weight: 600;
+        }
+    </style>
+}

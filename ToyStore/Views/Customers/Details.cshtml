@@ -1,61 +1,253 @@
 @model ToyStore.Domain.Entities.Customer
 
 @{
-    ViewData["Title"] = "Details";
+    ViewData["Title"] = "Chi tiết khách hàng";
+    var hasTier = Model.Tier != null;
 }
 
-<div class="crud-theme">
+<div class="customer-details">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
+        <div class="col-md-9 col-lg-8">
+            <div class="cd-card">
+                <div class="cd-card__header">
                     <h4 class="mb-0"><i class="fas fa-id-card me-2"></i>Chi tiết khách hàng</h4>
+                    <span class="cd-id">#@Model.CustomerId</span>
                 </div>
-                <div class="card-body">
-                    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.FullName)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.FullName)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Email)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Email)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Phone)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Phone)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Address)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Address)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.PasswordHash)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.PasswordHash)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.CreatedAt)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.CreatedAt)
-        </dd>
-                    </dl>
-                    <div class="d-flex justify-content-between mt-3">
-                        <a asp-action="Index" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
-                        <a asp-action="Edit" asp-route-id="@Model?.CustomerId" class="btn btn-warning"><i class="fas fa-edit me-1"></i>Sửa</a>
+
+                <div class="cd-card__body">
+                    <!-- Hồ sơ -->
+                    <div class="cd-profile">
+                        <div class="cd-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="cd-profile__info">
+                            <div class="cd-name">@Model.FullName</div>
+                            <div class="cd-email"><i class="fas fa-envelope me-2"></i>@Model.Email</div>
+                        </div>
+                        <div class="cd-profile__tier">
+                            @if (hasTier)
+                            {
+                                <span class="cd-tier-badge">
+                                    <i class="fas fa-crown me-1"></i>@Model.Tier!.TierName
+                                    <span class="cd-tier-badge__pct">@Model.Tier.DiscountPercent.ToString("0.##")%</span>
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="cd-tier-badge cd-tier-badge--regular">
+                                    <i class="fas fa-user me-1"></i>Tài khoản thường
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Thông tin liên hệ -->
+                    <div class="cd-section-title"><i class="fas fa-address-book me-2"></i>Thông tin liên hệ</div>
+                    <div class="row cd-info-grid">
+                        <div class="col-md-6">
+                            <div class="cd-field">
+                                <span class="cd-field__label"><i class="fas fa-phone"></i> Số điện thoại</span>
+                                <span class="cd-field__value">@(string.IsNullOrWhiteSpace(Model.Phone) ? "—" : Model.Phone)</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="cd-field">
+                                <span class="cd-field__label"><i class="fas fa-map-marker-alt"></i> Địa chỉ</span>
+                                <span class="cd-field__value">@(string.IsNullOrWhiteSpace(Model.Address) ? "—" : Model.Address)</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="cd-field">
+                                <span class="cd-field__label"><i class="fas fa-calendar-plus"></i> Ngày tạo</span>
+                                <span class="cd-field__value">@(Model.CreatedAt?.ToString("dd/MM/yyyy HH:mm") ?? "—")</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="cd-field">
+                                <span class="cd-field__label"><i class="fas fa-box-open"></i> Số đơn đã hoàn thành</span>
+                                <span class="cd-field__value">@Model.TotalCompletedOrders</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trạng thái thành viên -->
+                    <div class="cd-section-title"><i class="fas fa-crown me-2"></i>Hạng thành viên</div>
+                    <div class="cd-membership @(hasTier ? "cd-membership--member" : "cd-membership--regular")">
+                        @if (hasTier)
+                        {
+                            <p class="mb-1 cd-membership__text">
+                                Đang là thành viên <strong>@Model.Tier!.TierName</strong>,
+                                ưu đãi <strong class="cd-accent">@Model.Tier.DiscountPercent.ToString("0.##")%</strong> trên mỗi đơn hàng.
+                            </p>
+                            <p class="mb-0 cd-membership__meta">
+                                <i class="fas fa-box-open me-1"></i>Đã hoàn thành @Model.TotalCompletedOrders đơn hàng.
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="mb-0 cd-membership__meta">
+                                Khách hàng chưa đạt hạng thành viên nào.
+                            </p>
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a asp-action="Index" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i>Quay lại</a>
+                        <a asp-action="Edit" asp-route-id="@Model.CustomerId" class="btn btn-outline-light"><i class="fas fa-edit me-1"></i>Sửa</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    /* ===== Chi tiết khách hàng - Luxury Cinematic ===== */
+    .customer-details { color: #fff; padding: 1rem 0 2rem; }
+
+    .cd-card {
+        background: #111;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 0;
+    }
+
+    .cd-card__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .cd-card__header h4 {
+        color: #fff;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 1.05rem;
+    }
+
+    .cd-id {
+        font-family: 'Montserrat', sans-serif;
+        color: #b3b3b3;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        padding: 0.2rem 0.6rem;
+        letter-spacing: 0.06em;
+    }
+
+    .cd-card__body { padding: 1.5rem; }
+
+    /* Hồ sơ */
+    .cd-profile {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding-bottom: 1.25rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        flex-wrap: wrap;
+    }
+
+    .cd-avatar {
+        width: 56px;
+        height: 56px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        color: #fff;
+        flex: 0 0 auto;
+    }
+
+    .cd-profile__info { min-width: 0; flex: 1 1 auto; }
+    .cd-name {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 1.15rem;
+        color: #fff;
+        letter-spacing: 0.02em;
+    }
+    .cd-email { color: #b3b3b3; font-size: 0.9rem; margin-top: 2px; }
+
+    .cd-profile__tier { flex: 0 0 auto; }
+
+    .cd-tier-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: #f5d272;
+        border: 1px solid rgba(245, 210, 114, 0.5);
+        padding: 0.35rem 0.7rem;
+    }
+    .cd-tier-badge--regular { color: #b3b3b3; border-color: rgba(255, 255, 255, 0.25); }
+    .cd-tier-badge__pct { color: #4ade80; }
+
+    /* Tiêu đề mục */
+    .cd-section-title {
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #b3b3b3;
+        margin: 1.5rem 0 1rem;
+    }
+
+    /* Lưới thông tin */
+    .cd-info-grid { row-gap: 0.25rem; }
+
+    .cd-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.65rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .cd-field__label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #808080;
+    }
+    .cd-field__label i { width: 16px; text-align: center; margin-right: 4px; }
+    .cd-field__value { color: #fff; word-break: break-word; }
+
+    /* Khối thành viên */
+    .cd-membership {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 1rem 1.25rem;
+    }
+    .cd-membership--member { border-left: 2px solid #f5d272; }
+    .cd-membership--regular { border-left: 2px solid rgba(255, 255, 255, 0.25); }
+    .cd-membership__text { color: #fff; }
+    .cd-membership__meta { color: #b3b3b3; }
+    .cd-accent { color: #4ade80 !important; }
+
+    /* Nút ghost */
+    .customer-details .btn-outline-light {
+        background: transparent !important;
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        color: #fff !important;
+        border-radius: 0 !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 0.6rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    .customer-details .btn-outline-light:hover {
+        background: #fff !important;
+        color: #000 !important;
+        border-color: #fff !important;
+    }
+</style>

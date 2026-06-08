@@ -25,6 +25,7 @@ public partial class ToyStoreContext : DbContext
     public virtual DbSet<Product> Products { get; set; }
     public virtual DbSet<Promotion> Promotions { get; set; }
     public virtual DbSet<Banner> Banners { get; set; }
+    public virtual DbSet<MembershipTier> MembershipTiers { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -106,6 +107,27 @@ public partial class ToyStoreContext : DbContext
             entity.Property(e => e.FullName).HasMaxLength(100);
             entity.Property(e => e.PasswordHash).HasMaxLength(255);
             entity.Property(e => e.Phone).HasMaxLength(20);
+
+            // Hạng thành viên: tên cột map đúng theo DDL Oracle (phân biệt hoa/thường).
+            entity.Property(e => e.TotalCompletedOrders)
+                .HasColumnName("TotalCompletedOrders")
+                .HasColumnType("NUMBER")
+                .HasDefaultValue(0);
+            entity.Property(e => e.TierId)
+                .HasColumnName("TierID")
+                .HasColumnType("NUMBER");
+
+            // Oracle: NUMBER(1) cho cờ boolean — KHÔNG dùng .HasConversion().
+            entity.Property(e => e.IsLocked)
+                .HasColumnName("IsLocked")
+                .HasColumnType("NUMBER(1)")
+                .HasDefaultValueSql("0");
+
+            entity.HasOne(d => d.Tier)
+                .WithMany(t => t.Customers)
+                .HasForeignKey(d => d.TierId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Customer_MembershipTier");
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -125,6 +147,10 @@ public partial class ToyStoreContext : DbContext
             entity.Property(e => e.Subtotal).HasColumnType("NUMBER(12, 2)").HasDefaultValue(0);
             entity.Property(e => e.DiscountValue).HasColumnType("NUMBER(12, 2)").HasDefaultValue(0);
             entity.Property(e => e.DiscountStrategyName).HasMaxLength(50);
+            entity.Property(e => e.MembershipDiscountValue)
+                .HasColumnName("MembershipDiscountValue")
+                .HasColumnType("NUMBER(12, 2)")
+                .HasDefaultValue(0);
 
             entity.HasOne(d => d.Customer).WithMany(p => p.Orders)
                 .HasForeignKey(d => d.CustomerId)
@@ -216,6 +242,24 @@ public partial class ToyStoreContext : DbContext
                 .HasColumnName("CreatedAt")
                 .HasColumnType("TIMESTAMP")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<MembershipTier>(entity =>
+        {
+            // Map khớp DDL Oracle: tên bảng/cột phân biệt hoa/thường.
+            entity.HasKey(e => e.TierId).HasName("PK_MembershipTier");
+            entity.ToTable("MembershipTier");
+
+            entity.Property(e => e.TierId).HasColumnName("TierID");
+            entity.Property(e => e.TierName).HasColumnName("TierName").HasMaxLength(100);
+            entity.Property(e => e.RequiredOrders)
+                .HasColumnName("RequiredOrders")
+                .HasColumnType("NUMBER")
+                .HasDefaultValue(0);
+            entity.Property(e => e.DiscountPercent)
+                .HasColumnName("DiscountPercent")
+                .HasColumnType("NUMBER(5, 2)")
+                .HasDefaultValue(0);
         });
 
         OnModelCreatingPartial(modelBuilder);

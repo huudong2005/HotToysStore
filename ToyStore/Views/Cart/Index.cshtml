@@ -10,6 +10,10 @@
     if (finalAfterPromo < 0) finalAfterPromo = 0;
 
     Func<decimal, string> vnd = amount => amount.ToString("#,##0", System.Globalization.CultureInfo.InvariantCulture) + "đ";
+
+    // Danh sách mã khuyến mãi đang hoạt động (truyền từ CartController qua ViewBag).
+    var activePromotions = ViewBag.ActivePromotions as IEnumerable<ToyStore.Domain.Entities.Promotion>
+        ?? Enumerable.Empty<ToyStore.Domain.Entities.Promotion>();
 }
 
 <div class="container">
@@ -123,6 +127,41 @@
                                 </button>
                             </div>
                             <small id="promoMessage" class="d-block mt-2 text-muted"></small>
+
+                            @if (activePromotions.Any())
+                            {
+                                <div class="available-vouchers mt-3">
+                                    <div class="available-vouchers__title">
+                                        <i class="fas fa-ticket-alt"></i> Mã khuyến mãi đang hoạt động
+                                    </div>
+                                    <div class="voucher-scroll">
+                                        @foreach (var promo in activePromotions)
+                                        {
+                                            <div class="voucher-ticket">
+                                                <div class="voucher-ticket__info">
+                                                    <span class="voucher-ticket__code">@promo.PromotionCode</span>
+                                                    <span class="voucher-ticket__cond">
+                                                        @if (promo.MinOrderValue > 0)
+                                                        {
+                                                            <text>Đơn tối thiểu @vnd(promo.MinOrderValue)</text>
+                                                        }
+                                                        else
+                                                        {
+                                                            <text>Không yêu cầu đơn tối thiểu</text>
+                                                        }
+                                                    </span>
+                                                </div>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-light voucher-apply-btn"
+                                                        data-code="@promo.PromotionCode"
+                                                        title="Áp dụng mã @promo.PromotionCode">
+                                                    Dùng ngay
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
                         </div>
 
                         <div class="d-flex justify-content-between mb-2">
@@ -344,6 +383,100 @@ hr {
     color: var(--lux-muted, #b3b3b3) !important;
 }
 
+/* ====== Danh sách mã khuyến mãi (Voucher Tickets) ====== */
+.available-vouchers__title {
+    font-family: 'Montserrat', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--lux-muted, #b3b3b3);
+    margin-bottom: 0.6rem;
+}
+
+.available-vouchers__title i {
+    margin-right: 6px;
+    color: var(--lux-muted, #b3b3b3);
+}
+
+/* Vùng chứa voucher: giới hạn chiều cao + cuộn dọc để không kéo dài layout */
+.voucher-scroll {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 4px;
+    /* Firefox thin scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.25) transparent;
+}
+
+/* Custom scrollbar (WebKit) - mỏng & tối màu */
+.voucher-scroll::-webkit-scrollbar { width: 6px; }
+.voucher-scroll::-webkit-scrollbar-track { background: transparent; }
+.voucher-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.18);
+    border-radius: 0;
+}
+.voucher-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+
+/* Thẻ Voucher */
+.voucher-ticket {
+    background: #111;
+    border: 1px dashed rgba(255,255,255,0.2);
+    padding: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.voucher-ticket:last-child { margin-bottom: 0; }
+
+.voucher-ticket__info {
+    min-width: 0;          /* cho phép text co lại trong flex, tránh tràn */
+    display: flex;
+    flex-direction: column;
+}
+
+.voucher-ticket__code {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #4ade80;        /* xanh neon nổi bật trên nền tối */
+    text-transform: uppercase;
+    word-break: break-all;
+    line-height: 1.2;
+}
+
+.voucher-ticket__cond {
+    font-size: 0.72rem;
+    color: var(--lux-muted, #b3b3b3);
+    margin-top: 2px;
+}
+
+/* Nút "Dùng ngay" - ghost nhỏ gọn, không bị letter-spacing kéo rộng */
+.voucher-apply-btn.btn-sm {
+    flex: 0 0 auto;
+    background: transparent !important;
+    border: 1px solid var(--lux-line, rgba(255,255,255,0.4)) !important;
+    color: var(--lux-white, #fff) !important;
+    border-radius: 0 !important;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.68rem;
+    padding: 0.3rem 0.6rem;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+
+.voucher-apply-btn.btn-sm:hover {
+    background: var(--lux-white, #fff) !important;
+    color: #000 !important;
+    border-color: var(--lux-white, #fff) !important;
+}
+
 /* Responsive */
 @@media (max-width: 768px) {
     .d-flex.align-items-center {
@@ -454,6 +587,19 @@ function changeQuantity(productId, newQuantity) {
                     e.preventDefault();
                     applyPromo();
                 }
+            });
+
+            // Bấm "Dùng ngay" trên thẻ Voucher: điền mã vào ô nhập rồi kích hoạt nút Áp dụng gốc
+            // (tái sử dụng toàn bộ logic AJAX + Oracle Procedure hiện có).
+            document.querySelectorAll('.voucher-apply-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const code = (this.getAttribute('data-code') || '').trim();
+                    if (!code) return;
+                    promoInput.value = code;
+                    applyBtn.click();
+                    // Cuộn ô nhập vào tầm nhìn để khách thấy mã vừa được điền.
+                    promoInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
             });
         })();
     </script>

@@ -37,6 +37,17 @@ namespace ToyStore.Controllers
             ViewBag.DiscountStrategies = _discountService.GetAllStrategies();
             ViewBag.IsLoggedIn = _sessionService.IsCustomer(HttpContext);
 
+            // Danh sách mã khuyến mãi đang hoạt động để khách chọn & áp dụng nhanh.
+            try
+            {
+                ViewBag.ActivePromotions = await _unitOfWork.Promotions.GetActivePromotionsAsync();
+            }
+            catch
+            {
+                // Không để lỗi danh sách voucher chặn việc hiển thị giỏ hàng.
+                ViewBag.ActivePromotions = Enumerable.Empty<ToyStore.Domain.Entities.Promotion>();
+            }
+
             // Khôi phục mã khuyến mãi đã áp dụng (nếu có) để hiển thị lại sau khi reload trang.
             ViewBag.AppliedPromoCode = HttpContext.Session.GetString("AppliedPromoCode");
             var storedDiscount = HttpContext.Session.GetString("DiscountValue");
@@ -272,6 +283,26 @@ namespace ToyStore.Controllers
             ViewBag.Cart = cart;
             ViewBag.DiscountStrategies = _discountService.GetAllStrategies();
 
+            // Lấy giá trị khuyến mãi đã áp dụng từ Session (đảm bảo an toàn khi parse).
+            decimal subTotal = cart.Subtotal;
+            decimal discountValue = 0m;
+            try
+            {
+                var storedDiscount = HttpContext.Session.GetString("DiscountValue");
+                if (!string.IsNullOrWhiteSpace(storedDiscount))
+                {
+                    decimal.TryParse(storedDiscount, NumberStyles.Any, CultureInfo.InvariantCulture, out discountValue);
+                }
+            }
+            catch
+            {
+                discountValue = 0m;
+            }
+
+            // Không cho phép khuyến mãi (voucher) âm hoặc vượt quá tổng tiền hàng.
+            if (discountValue < 0) discountValue = 0m;
+            if (discountValue > subTotal) discountValue = subTotal;
+
             var isLoggedIn = _sessionService.IsCustomer(HttpContext);
             var model = new CheckoutPageViewModel
             {
@@ -279,10 +310,30 @@ namespace ToyStore.Controllers
                 PaymentMethod = "COD"
             };
 
+            // Mặc định: không có ưu đãi hạng thẻ.
+            decimal membershipDiscountValue = 0m;
+            string? tierName = null;
+
             if (isLoggedIn)
             {
                 var customerId = _sessionService.GetUserId(HttpContext);
-                model.Customer = await _unitOfWork.Customers.GetByIdAsync(customerId);
+
+                // Include cả Tier để biết DiscountPercent của hạng thẻ.
+                var customer = await _unitOfWork.Customers.GetCustomerWithTierAsync(customerId);
+                model.Customer = customer;
+
+                // Tính giảm giá VIP nếu khách có hạng thẻ (null checking đầy đủ).
+                if (customer?.Tier != null && customer.Tier.DiscountPercent > 0)
+                {
+                    membershipDiscountValue = subTotal * (customer.Tier.DiscountPercent / 100m);
+
+                    // Phòng thủ: không cho giảm âm hoặc vượt quá tổng tiền hàng.
+                    if (membershipDiscountValue < 0) membershipDiscountValue = 0m;
+                    if (membershipDiscountValue > subTotal) membershipDiscountValue = subTotal;
+
+                    // Ví dụ hiển thị: "Gold (10%)".
+                    tierName = $"{customer.Tier.TierName} ({customer.Tier.DiscountPercent:0.##}%)";
+                }
             }
             else
             {
@@ -292,6 +343,16 @@ namespace ToyStore.Controllers
                     model.Guest = savedGuest;
                 }
             }
+
+            // Giảm giá xếp chồng (stackable): tổng cộng = Tạm tính - Ưu đãi hạng thẻ - Voucher.
+            decimal finalTotal = subTotal - membershipDiscountValue - discountValue;
+            if (finalTotal < 0) finalTotal = 0m;
+
+            ViewBag.SubTotal = subTotal;
+            ViewBag.DiscountValue = discountValue;
+            ViewBag.MembershipDiscountValue = membershipDiscountValue;
+            ViewBag.TierName = tierName;
+            ViewBag.FinalTotal = finalTotal;
 
             return View(model);
         }

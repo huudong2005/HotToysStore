@@ -41,6 +41,7 @@
                             <th><i class="fas fa-phone me-2"></i>Số điện thoại</th>
                             <th><i class="fas fa-map-marker-alt me-2"></i>Địa chỉ</th>
                             <th><i class="fas fa-calendar me-2"></i>Ngày tạo</th>
+                            <th><i class="fas fa-shield-alt me-2"></i>Trạng thái</th>
                             <th><i class="fas fa-cogs me-2"></i>Thao tác</th>
                         </tr>
                     </thead>
@@ -94,13 +95,35 @@
                                     <span class="text-muted">@item.CreatedAt?.ToString("dd/MM/yyyy")</span>
                                 </td>
                                 <td>
-                                    <div class="btn-group" role="group">
+                                    @if (item.IsLocked)
+                                    {
+                                        <span class="badge status-badge status-badge--locked" id="status-badge-@item.CustomerId">
+                                            <i class="fas fa-lock me-1"></i>Bị khóa
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge status-badge status-badge--active" id="status-badge-@item.CustomerId">
+                                            <i class="fas fa-check-circle me-1"></i>Hoạt động
+                                        </span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="btn-group customer-actions" role="group">
                                         <a asp-action="Details" asp-route-id="@item.CustomerId" class="btn btn-sm btn-info" title="Xem chi tiết">
                                             <i class="fas fa-eye"></i>
                                         </a>
                                         <a asp-action="Edit" asp-route-id="@item.CustomerId" class="btn btn-sm btn-warning" title="Sửa">
                                             <i class="fas fa-edit"></i>
                                         </a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-light btn-toggle-lock"
+                                                data-id="@item.CustomerId"
+                                                data-locked="@(item.IsLocked ? "true" : "false")"
+                                                title="@(item.IsLocked ? "Mở khóa tài khoản" : "Khóa tài khoản")"
+                                                id="toggle-lock-@item.CustomerId">
+                                            <i class="fas @(item.IsLocked ? "fa-lock-open" : "fa-lock")"></i>
+                                        </button>
                                         <a asp-action="Delete" asp-route-id="@item.CustomerId" class="btn btn-sm btn-danger" title="Xóa">
                                             <i class="fas fa-trash"></i>
                                         </a>
@@ -123,6 +146,11 @@
         }
     </div>
 </div>
+
+@* Token chống giả mạo cho AJAX khóa/mở khóa *@
+<form id="antiForgeryForm" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
 
 <style>
     /* ===== Quản lý khách hàng - Luxury Cinematic Gallery ===== */
@@ -232,4 +260,115 @@
         letter-spacing: 0.06em;
         text-transform: uppercase;
     }
+
+    /* Badge trạng thái tài khoản */
+    .status-badge {
+        background: transparent !important;
+        border-radius: 0 !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        padding: 0.35rem 0.6rem;
+    }
+
+    .status-badge--active {
+        border: 1px solid rgba(74, 222, 128, 0.5) !important;
+        color: #4ade80 !important;
+    }
+
+    .status-badge--locked {
+        border: 1px solid rgba(248, 113, 113, 0.5) !important;
+        color: #f87171 !important;
+    }
+
+    /* Nút khóa/mở khóa */
+    .btn-outline-light {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+    }
+
+    .btn-outline-light:hover {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
+        border-color: var(--lux-white, #fff) !important;
+    }
+
+    .customer-actions .btn { margin-right: 4px; }
+    .customer-actions .btn:last-child { margin-right: 0; }
 </style>
+
+@section Scripts {
+    <script>
+        (function () {
+            const tokenInput = document.querySelector('#antiForgeryForm input[name="__RequestVerificationToken"]');
+            if (!tokenInput) return;
+
+            function updateStatusBadge(customerId, isLocked) {
+                const badge = document.getElementById('status-badge-' + customerId);
+                if (!badge) return;
+
+                badge.classList.remove('status-badge--active', 'status-badge--locked');
+                if (isLocked) {
+                    badge.classList.add('status-badge--locked');
+                    badge.innerHTML = '<i class="fas fa-lock me-1"></i>Bị khóa';
+                } else {
+                    badge.classList.add('status-badge--active');
+                    badge.innerHTML = '<i class="fas fa-check-circle me-1"></i>Hoạt động';
+                }
+            }
+
+            function updateToggleButton(btn, isLocked) {
+                btn.dataset.locked = isLocked ? 'true' : 'false';
+                btn.title = isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản';
+                const icon = btn.querySelector('i');
+                if (icon) {
+                    icon.className = isLocked ? 'fas fa-lock-open' : 'fas fa-lock';
+                }
+            }
+
+            document.querySelectorAll('.btn-toggle-lock').forEach(function (btn) {
+                btn.addEventListener('click', async function () {
+                    const customerId = this.dataset.id;
+                    const isCurrentlyLocked = this.dataset.locked === 'true';
+                    const action = isCurrentlyLocked ? 'mở khóa' : 'khóa';
+
+                    if (!confirm('Bạn có chắc muốn ' + action + ' tài khoản khách hàng #' + customerId + '?')) {
+                        return;
+                    }
+
+                    const originalHtml = this.innerHTML;
+                    this.disabled = true;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                    try {
+                        const response = await fetch('/Customers/ToggleLock?id=' + customerId, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'RequestVerificationToken': tokenInput.value
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            updateStatusBadge(customerId, data.isLocked);
+                            updateToggleButton(this, data.isLocked);
+                        } else {
+                            alert(data.message || 'Không thể thay đổi trạng thái tài khoản.');
+                        }
+                    } catch (err) {
+                        alert('Có lỗi xảy ra, vui lòng thử lại.');
+                    } finally {
+                        this.disabled = false;
+                        updateToggleButton(this, this.dataset.locked === 'true');
+                    }
+                });
+            });
+        })();
+    </script>
+}

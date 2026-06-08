@@ -63,6 +63,10 @@ namespace ToyStore.Controllers
 
                 var createdOrder = await _checkoutFacade.PlaceOrderAsync(cart, customerId, paymentMethod);
 
+                // Áp dụng ưu đãi hạng thẻ thành viên (xếp chồng): gán MembershipDiscountValue
+                // và trừ thêm vào tổng tiền của đơn trước khi hoàn tất.
+                await ApplyMembershipDiscountAsync(createdOrder, cart);
+
                 await _cartStorage.ClearCartAfterOrderAsync(HttpContext, customerId);
 
                 await _orderEventDispatcher.PublishAsync(new OrderConfirmedEvent(createdOrder));
@@ -299,6 +303,54 @@ namespace ToyStore.Controllers
             {
                 TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
                 return RedirectToAction("MyOrders");
+            }
+        }
+
+        /// <summary>
+        /// Tính & gán giá trị giảm theo hạng thẻ thành viên cho đơn hàng vừa tạo,
+        /// đồng thời trừ vào TotalAmount. Bảo đảm an toàn null và không cho tổng tiền âm.
+        /// </summary>
+        private async Task ApplyMembershipDiscountAsync(Order order, ShoppingCart cart)
+        {
+            if (order == null)
+            {
+                return;
+            }
+
+            // Lấy khách hàng kèm hạng thẻ (Include Tier) để biết DiscountPercent.
+            var customer = await _unitOfWork.Customers.GetCustomerWithTierAsync(order.CustomerId);
+            if (customer?.Tier == null || customer.Tier.DiscountPercent <= 0)
+            {
+                return; // Khách không có hạng thẻ -> không áp ưu đãi.
+            }
+
+            decimal subtotal = cart?.Subtotal ?? order.Subtotal;
+            decimal membershipDiscount = subtotal * (customer.Tier.DiscountPercent / 100m);
+
+            // Phòng thủ: chặn giá trị âm và không vượt quá tổng tiền hiện tại của đơn.
+            if (membershipDiscount < 0) membershipDiscount = 0m;
+            if (membershipDiscount > order.TotalAmount) membershipDiscount = order.TotalAmount;
+
+            if (membershipDiscount <= 0)
+            {
+                return;
+            }
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                order.MembershipDiscountValue = membershipDiscount;
+                order.TotalAmount -= membershipDiscount;
+                if (order.TotalAmount < 0) order.TotalAmount = 0m;
+
+                _unitOfWork.Orders.Update(order);
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
             }
         }
 

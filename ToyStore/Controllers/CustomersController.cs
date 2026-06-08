@@ -42,8 +42,8 @@ namespace ToyStore.Controllers
                 return NotFound();
             }
 
-            var customer = await _unitOfWork.Customers.Query()
-                .FirstOrDefaultAsync(m => m.CustomerId == id);
+            // Nạp kèm hạng thẻ (Include Tier) để hiển thị trạng thái thành viên.
+            var customer = await _unitOfWork.Customers.GetCustomerWithTierAsync(id.Value);
             if (customer == null)
             {
                 return NotFound();
@@ -210,6 +210,60 @@ namespace ToyStore.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // POST: Customers/ToggleLock/5 — Khóa / mở khóa tài khoản khách hàng.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [AuthorizeRole("Admin")]
+        public async Task<IActionResult> ToggleLock(int id)
+        {
+            try
+            {
+                var customer = await _unitOfWork.Customers.GetByIdAsync(id);
+                if (customer == null)
+                {
+                    if (WantsJsonResponse())
+                    {
+                        return Json(new { success = false, message = "Khách hàng không tồn tại." });
+                    }
+
+                    TempData["ErrorMessage"] = "Khách hàng không tồn tại.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                customer.IsLocked = !customer.IsLocked;
+                _unitOfWork.Customers.Update(customer);
+                await _unitOfWork.SaveChangesAsync();
+
+                var message = customer.IsLocked
+                    ? $"Đã khóa tài khoản \"{customer.FullName}\"."
+                    : $"Đã mở khóa tài khoản \"{customer.FullName}\".";
+
+                if (WantsJsonResponse())
+                {
+                    return Json(new { success = true, isLocked = customer.IsLocked, message });
+                }
+
+                TempData["SuccessMessage"] = message;
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                if (WantsJsonResponse())
+                {
+                    return Json(new { success = false, message = "Lỗi: " + ex.Message });
+                }
+
+                TempData["ErrorMessage"] = "Lỗi khi thay đổi trạng thái khóa: " + ex.Message;
+                return RedirectToAction(nameof(Index));
+            }
+        }
+
+        private bool WantsJsonResponse()
+        {
+            var accept = Request.Headers.Accept.ToString();
+            return accept.Contains("application/json", StringComparison.OrdinalIgnoreCase);
+        }
+
         private bool CustomerExists(int id)
         {
             return _unitOfWork.Customers.Query().Count(e => e.CustomerId == id) > 0;
@@ -225,11 +279,14 @@ namespace ToyStore.Controllers
                 return RedirectToAction("Login", "Auth");
             }
 
-            var customer = await _unitOfWork.Customers.GetByIdAsync(userSession.UserId);
+            // Nạp kèm hạng thẻ (Include Tier) để hiển thị trạng thái thành viên.
+            var customer = await _unitOfWork.Customers.GetCustomerWithTierAsync(userSession.UserId);
             if (customer == null)
             {
                 return NotFound();
             }
+
+            await PopulateMembershipStatusAsync(customer.CustomerId);
 
             var viewModel = new EditCustomerViewModel
             {
@@ -258,6 +315,9 @@ namespace ToyStore.Controllers
             {
                 return Forbid();
             }
+
+            // Luôn nạp trạng thái thành viên để hiển thị đúng khi render lại trang (kể cả khi có lỗi).
+            await PopulateMembershipStatusAsync(model.CustomerId);
 
             // Kiểm tra email có trùng với customer khác không
             var existingCustomer = await _unitOfWork.Customers.Query()
@@ -315,6 +375,50 @@ namespace ToyStore.Controllers
             }
 
             return View(model);
+        }
+
+        /// <summary>
+        /// Tính toán & đẩy thông tin trạng thái hạng thành viên ra ViewBag cho trang hồ sơ:
+        /// hạng hiện tại, % ưu đãi, số đơn đã hoàn thành và tiến độ lên hạng kế tiếp.
+        /// </summary>
+        private async Task PopulateMembershipStatusAsync(int customerId)
+        {
+            // Mặc định: tài khoản thường (chưa có hạng).
+            ViewBag.HasTier = false;
+            ViewBag.TierName = null;
+            ViewBag.DiscountPercent = 0m;
+            ViewBag.TotalCompletedOrders = 0;
+            ViewBag.NextTierName = null;
+            ViewBag.OrdersToNextTier = 0;
+
+            var customer = await _unitOfWork.Customers.GetCustomerWithTierAsync(customerId);
+            if (customer == null)
+            {
+                return;
+            }
+
+            int completed = customer.TotalCompletedOrders;
+            ViewBag.TotalCompletedOrders = completed;
+
+            if (customer.Tier != null)
+            {
+                ViewBag.HasTier = true;
+                ViewBag.TierName = customer.Tier.TierName;
+                ViewBag.DiscountPercent = customer.Tier.DiscountPercent;
+            }
+
+            // Tìm hạng kế tiếp: hạng có RequiredOrders nhỏ nhất nhưng vẫn lớn hơn số đơn hiện tại.
+            var tiers = await _unitOfWork.MembershipTiers.GetAllOrderedByRequiredOrdersDescAsync();
+            var nextTier = tiers?
+                .Where(t => t.RequiredOrders > completed)
+                .OrderBy(t => t.RequiredOrders)
+                .FirstOrDefault();
+
+            if (nextTier != null)
+            {
+                ViewBag.NextTierName = nextTier.TierName;
+                ViewBag.OrdersToNextTier = nextTier.RequiredOrders - completed;
+            }
         }
 
     }

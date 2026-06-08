@@ -90,6 +90,21 @@ public class PromotionRepository : GenericRepository<Promotion>, IPromotionRepos
             : 0m;
     }
 
+    public async Task<IEnumerable<Promotion>> GetActivePromotionsAsync()
+    {
+        var now = DateTime.Now;
+
+        return await _dbSet
+            .Where(p => p.IsActive
+                        && p.StartDate <= now
+                        && p.EndDate >= now
+                        // UsageLimit = 0: không giới hạn lượt dùng; ngược lại phải còn lượt (UsedCount < UsageLimit).
+                        && (p.UsageLimit == 0 || p.UsedCount < p.UsageLimit))
+            .OrderBy(p => p.MinOrderValue)
+            .ThenBy(p => p.EndDate)
+            .ToListAsync();
+    }
+
     public async Task<bool> IsCodeExistsAsync(string promotionCode, int? excludeId = null)
     {
         if (string.IsNullOrWhiteSpace(promotionCode))
