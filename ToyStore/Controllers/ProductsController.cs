@@ -14,12 +14,20 @@ namespace ToyStore.Controllers
     public class ProductsController : Controller
     {
         private readonly ToyStoreContext _context;
-        private readonly IProductRepository _productRepository; // Inject Repository vào đây
+        private readonly IProductRepository _productRepository;
+        private readonly IWebHostEnvironment _env;
 
-        public ProductsController(ToyStoreContext context, IProductRepository productRepository)
+        private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+        private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
+
+        public ProductsController(
+            ToyStoreContext context,
+            IProductRepository productRepository,
+            IWebHostEnvironment env)
         {
             _context = context;
             _productRepository = productRepository;
+            _env = env;
         }
 
         // GET: Products
@@ -69,12 +77,26 @@ namespace ToyStore.Controllers
         // POST: Products/Create - SỬ DỤNG PROCEDURE QUA REPOSITORY
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product)
+        public async Task<IActionResult> Create(Product product, IFormFile? imageFile)
         {
-            // Loại bỏ kiểm tra Validation cho object Category vì chúng ta chỉ cần CategoryId
             ModelState.Remove("Category");
             ModelState.Remove("CartItems");
             ModelState.Remove("OrderDetails");
+            ModelState.Remove(nameof(Product.ImageUrl));
+            ModelState.Remove("imageFile");
+
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                var (ok, path, error) = await SaveImageAsync(imageFile);
+                if (!ok)
+                {
+                    ModelState.AddModelError("imageFile", error);
+                }
+                else
+                {
+                    product.ImageUrl = path;
+                }
+            }
 
             if (ModelState.IsValid)
             {
@@ -90,7 +112,6 @@ namespace ToyStore.Controllers
                 }
             }
 
-            // Nếu lỗi Validation (như thiếu tên sản phẩm), load lại Category cho Dropdown
             ViewBag.Categories = await _context.Categories.ToListAsync();
             return View(product);
         }
@@ -109,11 +130,10 @@ namespace ToyStore.Controllers
         // POST: Products/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Product product)
+        public async Task<IActionResult> Edit(int id, Product product, IFormFile? imageFile)
         {
             try
             {
-                // 1. RÀNBUỘC 1: Kiểm tra sản phẩm có tồn tại hay không
                 var existingProduct = await _context.Products.FindAsync(id);
                 if (existingProduct == null)
                 {
@@ -121,31 +141,47 @@ namespace ToyStore.Controllers
                     return RedirectToAction("Index");
                 }
 
-                // 2. RÀNBUỘC 2: Kiểm tra tên sản phẩm không được để trống
                 if (string.IsNullOrEmpty(product.ProductName))
                 {
                     TempData["ErrorMessage"] = "Tên sản phẩm không được để trống";
                     ViewBag.Categories = await _context.Categories.ToListAsync();
+                    product.ImageUrl = existingProduct.ImageUrl;
                     return View(product);
                 }
 
-                // 3. RÀNBUỘC 3: Kiểm tra tính hợp lệ của danh mục
                 if (product.CategoryId <= 0)
                 {
                     TempData["ErrorMessage"] = "Vui lòng chọn danh mục";
                     ViewBag.Categories = await _context.Categories.ToListAsync();
+                    product.ImageUrl = existingProduct.ImageUrl;
                     return View(product);
                 }
 
-                // Loại bỏ Validation cho các Object liên kết để tránh lỗi 400 như file Product.cs thiết lập
                 ModelState.Remove("Category");
                 ModelState.Remove("CartItems");
                 ModelState.Remove("OrderDetails");
+                ModelState.Remove(nameof(Product.ImageUrl));
+                ModelState.Remove("imageFile");
+
+                product.ProductId = id;
+                product.ImageUrl = existingProduct.ImageUrl;
+
+                if (imageFile != null && imageFile.Length > 0)
+                {
+                    var (ok, path, error) = await SaveImageAsync(imageFile);
+                    if (!ok)
+                    {
+                        ModelState.AddModelError("imageFile", error);
+                        ViewBag.Categories = await _context.Categories.ToListAsync();
+                        return View(product);
+                    }
+
+                    DeletePhysicalImage(existingProduct.ImageUrl);
+                    product.ImageUrl = path;
+                }
 
                 if (ModelState.IsValid)
                 {
-                    // Thay vì dùng _context.Products.Update(existingProduct) như cũ,
-                    // Chúng ta gọi Procedure của Oracle để thực hiện cập nhật
                     await _productRepository.UpdateProductViaProcedureAsync(product);
 
                     TempData["SuccessMessage"] = "Cập nhật sản phẩm thành công qua Stored Procedure!";
@@ -157,7 +193,6 @@ namespace ToyStore.Controllers
                 TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
             }
 
-            // Nếu có lỗi xảy ra hoặc ModelState không hợp lệ, trả về View kèm danh sách Categories
             ViewBag.Categories = await _context.Categories.ToListAsync();
             return View(product);
         }
@@ -207,6 +242,67 @@ namespace ToyStore.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<(bool Ok, string Path, string Error)> SaveImageAsync(IFormFile imageFile)
+        {
+            try
+            {
+                var ext = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+                if (string.IsNullOrEmpty(ext) || !AllowedExtensions.Contains(ext))
+                {
+                    return (false, string.Empty, "Định dạng ảnh không hợp lệ (chỉ chấp nhận jpg, jpeg, png, webp, gif).");
+                }
+
+                if (imageFile.Length > MaxFileSize)
+                {
+                    return (false, string.Empty, "Kích thước ảnh tối đa là 10MB.");
+                }
+
+                var webRoot = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                var uploadDir = Path.Combine(webRoot, "images", "products");
+
+                if (!Directory.Exists(uploadDir))
+                {
+                    Directory.CreateDirectory(uploadDir);
+                }
+
+                var fileName = Guid.NewGuid().ToString() + ext;
+                var fullPath = Path.Combine(uploadDir, fileName);
+
+                await using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await imageFile.CopyToAsync(stream);
+                }
+
+                return (true, $"/images/products/{fileName}", string.Empty);
+            }
+            catch (Exception ex)
+            {
+                return (false, string.Empty, "Lỗi khi lưu ảnh: " + ex.Message);
+            }
+        }
+
+        private void DeletePhysicalImage(string? imagePath)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(imagePath)) return;
+                if (!imagePath.StartsWith("/images/products/", StringComparison.OrdinalIgnoreCase)) return;
+
+                var webRoot = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                var relative = imagePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                var fullPath = Path.Combine(webRoot, relative);
+
+                if (System.IO.File.Exists(fullPath))
+                {
+                    System.IO.File.Delete(fullPath);
+                }
+            }
+            catch
+            {
+                // Bỏ qua lỗi xóa file vật lý.
+            }
         }
     }
 }

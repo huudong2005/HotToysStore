@@ -13,7 +13,7 @@
                 </div>
                 <div class="card-body">
                     @* Sửa: Dùng asp-controller và asp-action *@
-                    <form asp-controller="Products" asp-action="Create" method="post">
+                    <form asp-controller="Products" asp-action="Create" method="post" enctype="multipart/form-data">
                         @* QUAN TRỌNG: Thêm mã bảo mật để tránh lỗi 400 *@
                         @Html.AntiForgeryToken()
 
@@ -69,9 +69,13 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">URL hình ảnh</label>
-                            <input asp-for="ImageUrl" class="form-control" placeholder="https://example.com/image.jpg" />
-                            <small class="form-text text-muted">Nhập URL hình ảnh sản phẩm (tùy chọn)</small>
+                            <label class="form-label">Ảnh sản phẩm</label>
+                            <input type="file" name="imageFile" class="form-control" accept="image/*" />
+                            <small class="form-text text-muted">Chấp nhận jpg, jpeg, png, webp, gif — tối đa 10MB (tùy chọn)</small>
+                            @if (ViewData.ModelState["imageFile"]?.Errors.Count > 0)
+                            {
+                                <span class="text-danger small">@ViewData.ModelState["imageFile"]!.Errors[0].ErrorMessage</span>
+                            }
                         </div>
 
                         <div class="d-flex justify-content-between">

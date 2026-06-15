@@ -89,8 +89,14 @@ public class CustomerRepository : GenericRepository<Customer>, ICustomerReposito
             Direction = ParameterDirection.Output
         };
 
-        string sql = "BEGIN \"SP_DeleteCustomer\"(:p_CustomerId, :p_ResultCode); END;";
+        // Oracle lưu tên không quote thành SP_DELETECUSTOMER — không dùng "SP_DeleteCustomer".
+        string sql = "BEGIN SP_DELETECUSTOMER(:p_CustomerId, :p_ResultCode); END;";
         await _context.Database.ExecuteSqlRawAsync(sql, p_CustomerId, p_ResultCode);
+
+        if (p_ResultCode.Value == null || p_ResultCode.Value == DBNull.Value)
+        {
+            return 0;
+        }
 
         return Convert.ToInt32(p_ResultCode.Value.ToString());
     }

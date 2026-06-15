@@ -196,7 +196,11 @@ namespace ToyStore.Controllers
                 }
                 else if (resultCode == 2)
                 {
-                    TempData["ErrorMessage"] = "Không thể xóa khách hàng vì đã có lịch sử đơn hàng hoặc giỏ hàng.";
+                    TempData["ErrorMessage"] = "Không thể xóa khách hàng vì đã có lịch sử đơn hàng.";
+                }
+                else if (resultCode == 0)
+                {
+                    TempData["ErrorMessage"] = "Không tìm thấy khách hàng cần xóa.";
                 }
                 else
                 {

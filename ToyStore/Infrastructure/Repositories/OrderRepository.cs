@@ -2,6 +2,7 @@
 using ToyStore.Domain.Entities;
 using ToyStore.Domain.Interfaces;
 using ToyStore.Infrastructure.Data;
+using ToyStore.Models;
 using Oracle.ManagedDataAccess.Client;
 using System.Data;
 
@@ -37,6 +38,56 @@ public class OrderRepository : GenericRepository<Order>, IOrderRepository
             .Where(o => o.Status == status)
             .OrderByDescending(o => o.OrderDate)
             .ToListAsync();
+    }
+
+    public async Task<IEnumerable<PromotionStatisticViewModel>> GetPromotionStatisticsAsync(DateTime startDate, DateTime endDate)
+    {
+        const string completedStatus = "Hoàn thành";
+
+        var monthlyStats = await _dbSet
+            .Where(o => o.Status == completedStatus
+                && o.OrderDate.HasValue
+                && o.OrderDate.Value >= startDate
+                && o.OrderDate.Value <= endDate)
+            .GroupBy(o => new { o.OrderDate!.Value.Year, o.OrderDate!.Value.Month })
+            .Select(g => new PromotionStatisticViewModel
+            {
+                Year = g.Key.Year,
+                Month = g.Key.Month,
+                TotalVoucherDiscount = g.Sum(o => o.DiscountValue),
+                TotalMembershipDiscount = g.Sum(o => o.MembershipDiscountValue),
+                TotalDiscount = g.Sum(o => o.DiscountValue + o.MembershipDiscountValue),
+                ActualRevenue = g.Sum(o => o.TotalAmount)
+            })
+            .ToListAsync();
+
+        var monthsInRange = new List<(int Year, int Month)>();
+        var cursor = new DateTime(startDate.Year, startDate.Month, 1);
+        var lastMonth = new DateTime(endDate.Year, endDate.Month, 1);
+
+        while (cursor <= lastMonth)
+        {
+            monthsInRange.Add((cursor.Year, cursor.Month));
+            cursor = cursor.AddMonths(1);
+        }
+
+        return monthsInRange
+            .Select(ym =>
+            {
+                var stat = monthlyStats.FirstOrDefault(s => s.Year == ym.Year && s.Month == ym.Month);
+                return stat ?? new PromotionStatisticViewModel
+                {
+                    Year = ym.Year,
+                    Month = ym.Month,
+                    TotalVoucherDiscount = 0m,
+                    TotalMembershipDiscount = 0m,
+                    TotalDiscount = 0m,
+                    ActualRevenue = 0m
+                };
+            })
+            .OrderBy(s => s.Year)
+            .ThenBy(s => s.Month)
+            .ToList();
     }
 
     // ---- TRIỂN KHAI STORED PROCEDURE ----

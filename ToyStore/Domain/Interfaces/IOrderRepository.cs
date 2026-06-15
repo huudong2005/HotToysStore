@@ -1,4 +1,5 @@
 ﻿using ToyStore.Domain.Entities;
+using ToyStore.Models;
 
 namespace ToyStore.Domain.Interfaces;
 
@@ -7,6 +8,7 @@ public interface IOrderRepository : IGenericRepository<Order>
     Task<IEnumerable<Order>> GetOrdersByCustomerIdAsync(int customerId);
     Task<Order?> GetOrderWithDetailsAsync(int orderId);
     Task<IEnumerable<Order>> GetOrdersByStatusAsync(string status);
+    Task<IEnumerable<PromotionStatisticViewModel>> GetPromotionStatisticsAsync(DateTime startDate, DateTime endDate);
 
     // Thêm mới cho Oracle Stored Procedure
     Task<int> DeleteOrderViaProcedureAsync(int orderId);

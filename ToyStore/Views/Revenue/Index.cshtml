@@ -1,0 +1,323 @@
+@model IEnumerable<ToyStore.Models.PromotionStatisticViewModel>
+
+@{
+    ViewData["Title"] = "Khuyến mãi & Doanh thu";
+    var filterMode = ViewBag.FilterMode as string ?? "Year";
+    var selectedYear = ViewBag.SelectedYear as int?;
+    var startDate = ViewBag.StartDate as DateTime?;
+    var endDate = ViewBag.EndDate as DateTime?;
+    var rangeStart = ViewBag.RangeStart as DateTime? ?? DateTime.Now;
+    var rangeEnd = ViewBag.RangeEnd as DateTime? ?? DateTime.Now;
+    var stats = Model?.ToList() ?? new List<ToyStore.Models.PromotionStatisticViewModel>();
+
+    var periodTotalVoucher = stats.Sum(x => x.TotalVoucherDiscount);
+    var periodTotalMembership = stats.Sum(x => x.TotalMembershipDiscount);
+    var periodTotalPromotion = stats.Sum(x => x.TotalDiscount);
+
+    var periodLabel = filterMode == "DateRange"
+        ? $"{rangeStart:dd/MM/yyyy} – {rangeEnd:dd/MM/yyyy}"
+        : $"Cả năm {selectedYear ?? DateTime.Now.Year}";
+
+    var tableTitle = filterMode == "DateRange"
+        ? $"Chi tiết theo tháng — {periodLabel}"
+        : $"Chi tiết theo tháng — {selectedYear ?? DateTime.Now.Year}";
+}
+
+@functions {
+    string FormatVnd(decimal amount)
+    {
+        return amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + " ₫";
+    }
+
+    string FormatMonthLabel(ToyStore.Models.PromotionStatisticViewModel item, string mode)
+    {
+        return mode == "Year"
+            ? $"Tháng {item.Month}"
+            : $"Tháng {item.Month}/{item.Year}";
+    }
+}
+
+<div class="container-fluid revenue-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <h2 class="revenue-title">
+            <i class="fas fa-tags me-2"></i> Thống kê Khuyến mãi &amp; Doanh thu
+        </h2>
+
+        <form method="get" asp-action="Index" class="revenue-filter-form d-flex flex-wrap align-items-center gap-3">
+            <div class="d-flex align-items-center">
+                <label class="revenue-label mb-0 me-2">Năm:</label>
+                <select name="year" class="form-select revenue-input" style="min-width: 100px;">
+                    <option value="">-- Chọn --</option>
+                    @foreach (var y in new[] { 2025, 2026, 2027 })
+                    {
+                        if (selectedYear == y)
+                        {
+                            <option value="@y" selected>@y</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div class="text-muted small">HOẶC</div>
+
+            <div class="d-flex align-items-center gap-2">
+                <label class="revenue-label mb-0">Từ:</label>
+                <input type="date" name="startDate" value="@(startDate?.ToString("yyyy-MM-dd"))" class="form-control revenue-input" />
+
+                <label class="revenue-label mb-0 ms-1">Đến:</label>
+                <input type="date" name="endDate" value="@(endDate?.ToString("yyyy-MM-dd"))" class="form-control revenue-input" />
+            </div>
+
+            <button type="submit" class="btn btn-outline-light btn-sm ms-2">
+                <i class="fas fa-filter me-1"></i> Áp dụng
+            </button>
+
+            <a asp-action="Index" class="btn btn-link text-muted btn-sm text-decoration-none">Xóa lọc</a>
+        </form>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+            <div class="card revenue-ghost-card h-100">
+                <div class="card-body">
+                    <h6 class="revenue-card-label">Tổng tiền giảm qua Voucher</h6>
+                    <p class="revenue-card-value">@FormatVnd(periodTotalVoucher)</p>
+                    <small class="revenue-card-hint">@periodLabel</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card revenue-ghost-card h-100">
+                <div class="card-body">
+                    <h6 class="revenue-card-label">Tổng tiền giảm qua Hạng thành viên</h6>
+                    <p class="revenue-card-value">@FormatVnd(periodTotalMembership)</p>
+                    <small class="revenue-card-hint">@periodLabel</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card revenue-ghost-card h-100">
+                <div class="card-body">
+                    <h6 class="revenue-card-label">Tổng ngân sách khuyến mãi đã chi</h6>
+                    <p class="revenue-card-value revenue-card-value-accent">@FormatVnd(periodTotalPromotion)</p>
+                    <small class="revenue-card-hint">Voucher + Thành viên · @periodLabel</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card revenue-table-card">
+        <div class="card-header revenue-table-header py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-table me-2"></i> @tableTitle
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover revenue-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Tháng</th>
+                            <th class="text-end">Tiền giảm Voucher</th>
+                            <th class="text-end">Tiền giảm Hạng VIP</th>
+                            <th class="text-end">Tổng chi khuyến mãi</th>
+                            <th class="text-end">Doanh thu thực tế thu về</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (stats.Any())
+                        {
+                            @foreach (var item in stats)
+                            {
+                                <tr>
+                                    <td>@FormatMonthLabel(item, filterMode)</td>
+                                    <td class="text-end">@FormatVnd(item.TotalVoucherDiscount)</td>
+                                    <td class="text-end">@FormatVnd(item.TotalMembershipDiscount)</td>
+                                    <td class="text-end">@FormatVnd(item.TotalDiscount)</td>
+                                    <td class="text-end revenue-actual">@FormatVnd(item.ActualRevenue)</td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">Không có dữ liệu trong khoảng thời gian đã chọn.</td>
+                            </tr>
+                        }
+                    </tbody>
+                    @if (stats.Any())
+                    {
+                        <tfoot>
+                            <tr class="revenue-table-total">
+                                <td>Tổng cộng</td>
+                                <td class="text-end">@FormatVnd(periodTotalVoucher)</td>
+                                <td class="text-end">@FormatVnd(periodTotalMembership)</td>
+                                <td class="text-end">@FormatVnd(periodTotalPromotion)</td>
+                                <td class="text-end revenue-actual">@FormatVnd(stats.Sum(x => x.ActualRevenue))</td>
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ===== Thống kê Khuyến mãi & Doanh thu - Luxury Cinematic Gallery ===== */
+    .revenue-page {
+        color: var(--lux-white, #fff);
+    }
+
+    .revenue-title {
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 300;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        margin: 0;
+    }
+
+    .revenue-filter-form {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .revenue-label {
+        color: var(--lux-muted, #b3b3b3);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.78rem;
+    }
+
+    .revenue-input {
+        background: transparent !important;
+        border: 1px dashed var(--lux-line, rgba(255, 255, 255, 0.12)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+        min-width: 7rem;
+    }
+
+    .revenue-input:focus {
+        border-color: var(--lux-white, #fff) !important;
+        border-style: dashed !important;
+        box-shadow: none !important;
+    }
+
+    .revenue-filter-form .btn-outline-light {
+        border-radius: 0;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.75rem;
+    }
+
+    .revenue-ghost-card,
+    .revenue-table-card {
+        background: var(--lux-surface, #111);
+        border: 1px dashed var(--lux-line, rgba(255, 255, 255, 0.12));
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .revenue-card-label {
+        color: var(--lux-muted, #b3b3b3);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.78rem;
+        margin-bottom: 1rem;
+    }
+
+    .revenue-card-value {
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        font-size: 1.85rem;
+        font-weight: 700;
+        margin: 0 0 0.5rem;
+        letter-spacing: 0.02em;
+    }
+
+    .revenue-card-value-accent {
+        font-size: 2rem;
+    }
+
+    .revenue-card-hint {
+        color: var(--lux-muted, #b3b3b3);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .revenue-table-header {
+        background: transparent;
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        border-bottom: 1px dashed var(--lux-line, rgba(255, 255, 255, 0.12));
+    }
+
+    .revenue-table th,
+    .revenue-table td {
+        color: var(--lux-white, #fff);
+        font-family: 'Montserrat', sans-serif;
+        border-color: var(--lux-line, rgba(255, 255, 255, 0.12));
+        vertical-align: middle;
+        padding: 1rem 1.25rem;
+    }
+
+    .revenue-table thead th {
+        background: transparent;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.78rem;
+        border-bottom: 1px dashed var(--lux-line, rgba(255, 255, 255, 0.12));
+    }
+
+    .revenue-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .revenue-table tfoot tr.revenue-table-total {
+        border-top: 1px dashed var(--lux-line, rgba(255, 255, 255, 0.12));
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .revenue-table tfoot td {
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.85rem;
+    }
+
+    .revenue-actual {
+        font-weight: 600;
+    }
+
+    @@media (max-width: 991.98px) {
+        .revenue-card-value {
+            font-size: 1.45rem;
+        }
+
+        .revenue-card-value-accent {
+            font-size: 1.55rem;
+        }
+    }
+
+    /* Fix lỗi chữ trắng nền trắng cho thẻ select dropdown */
+    select.revenue-input option {
+        background-color: #111 !important;
+        color: #fff !important;
+    }
+</style>
