@@ -195,6 +195,7 @@ namespace ToyStore.Controllers
 
                     _unitOfWork.Orders.Update(existingOrder);
                     await _unitOfWork.SaveChangesAsync();
+                    TempData["SuccessMessage"] = $"Cập nhật đơn hàng #{order.OrderId} thành công!";
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -391,15 +392,13 @@ namespace ToyStore.Controllers
                 var normalizedNew = NormalizeStatus(newStatus);
                 if (!IsValidStatus(normalizedNew))
                 {
-                    TempData["ErrorMessage"] = "Trạng thái không hợp lệ.";
-                    return RedirectToAction(nameof(Index));
+                    return StatusUpdateResponse(false, "Trạng thái không hợp lệ.");
                 }
 
                 var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
                 if (order == null)
                 {
-                    TempData["ErrorMessage"] = "Đơn hàng không tồn tại.";
-                    return RedirectToAction(nameof(Index));
+                    return StatusUpdateResponse(false, "Đơn hàng không tồn tại.");
                 }
 
                 var oldStatus = NormalizeStatus(order.Status);
@@ -407,8 +406,11 @@ namespace ToyStore.Controllers
                 // Không có gì thay đổi -> báo nhẹ và quay lại.
                 if (string.Equals(oldStatus, normalizedNew, StringComparison.Ordinal))
                 {
-                    TempData["SuccessMessage"] = $"Đơn hàng #{order.OrderId} đã ở trạng thái \"{normalizedNew}\".";
-                    return RedirectToAction(nameof(Index));
+                    return StatusUpdateResponse(
+                        true,
+                        $"Đơn hàng #{order.OrderId} đã ở trạng thái \"{normalizedNew}\".",
+                        order.OrderId,
+                        normalizedNew);
                 }
 
                 // Bọc trong transaction để cập nhật trạng thái + thăng hạng là nguyên tử.
@@ -434,14 +436,41 @@ namespace ToyStore.Controllers
                     throw;
                 }
 
-                TempData["SuccessMessage"] = $"Đã cập nhật đơn hàng #{order.OrderId} sang trạng thái \"{normalizedNew}\".";
-                return RedirectToAction(nameof(Index));
+                return StatusUpdateResponse(
+                    true,
+                    $"Đã cập nhật đơn hàng #{order.OrderId} sang trạng thái \"{normalizedNew}\".",
+                    order.OrderId,
+                    normalizedNew);
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "Lỗi khi cập nhật trạng thái: " + ex.Message;
-                return RedirectToAction(nameof(Index));
+                return StatusUpdateResponse(false, "Lỗi khi cập nhật trạng thái: " + ex.Message);
             }
+        }
+
+        private IActionResult StatusUpdateResponse(bool success, string message, int? orderId = null, string? newStatus = null)
+        {
+            if (WantsJsonResponse())
+            {
+                return Json(new { success, message, orderId, newStatus });
+            }
+
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        private bool WantsJsonResponse()
+        {
+            var accept = Request.Headers.Accept.ToString();
+            return accept.Contains("application/json", StringComparison.OrdinalIgnoreCase);
         }
 
         // Kiểm tra trạng thái có nằm trong tập chuẩn hay không.

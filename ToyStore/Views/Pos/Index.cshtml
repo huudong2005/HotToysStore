@@ -1,0 +1,926 @@
+@{
+    ViewData["Title"] = "Bán hàng tại quầy (POS)";
+    Layout = "_Layout";
+}
+
+<style>
+    .pos-page {
+        --pos-bg: #050505;
+        --pos-panel: #0d0d0d;
+        --pos-border: rgba(255, 255, 255, 0.12);
+        --pos-text: #ffffff;
+        --pos-muted: #9a9a9a;
+        --pos-accent: #2ecc71;
+        --pos-accent-glow: rgba(46, 204, 113, 0.35);
+        --pos-gold: #c9a962;
+        min-height: calc(100vh - 72px);
+        background: var(--pos-bg);
+        color: var(--pos-text);
+        margin: -1rem -0.75rem 0;
+        padding: 0;
+    }
+
+    .pos-shell {
+        display: flex;
+        flex-wrap: nowrap;
+        min-height: calc(100vh - 72px);
+    }
+
+    .pos-left {
+        flex: 0 0 58.333%;
+        max-width: 58.333%;
+        border-right: 1px solid var(--pos-border);
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(180deg, #0a0a0a 0%, #050505 100%);
+    }
+
+    .pos-right {
+        flex: 0 0 41.667%;
+        max-width: 41.667%;
+        display: flex;
+        flex-direction: column;
+        background: #080808;
+    }
+
+    .pos-header {
+        padding: 1.25rem 1.5rem 0.75rem;
+        border-bottom: 1px solid var(--pos-border);
+    }
+
+    .pos-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 0.95rem;
+        color: var(--pos-gold);
+        margin: 0;
+    }
+
+    .pos-subtitle {
+        font-size: 0.8rem;
+        color: var(--pos-muted);
+        margin: 0.25rem 0 0;
+    }
+
+    .pos-search-wrap {
+        position: relative;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--pos-border);
+    }
+
+    .pos-search-input {
+        width: 100%;
+        background: #111 !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        color: #fff !important;
+        border-radius: 0 !important;
+        font-size: 1.15rem;
+        padding: 0.85rem 1rem 0.85rem 2.75rem;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .pos-search-input:focus {
+        border-color: var(--pos-gold) !important;
+        box-shadow: 0 0 0 0.15rem rgba(201, 169, 98, 0.15) !important;
+    }
+
+    .pos-search-icon {
+        position: absolute;
+        left: 2rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--pos-muted);
+        pointer-events: none;
+    }
+
+    .pos-suggest-list {
+        position: absolute;
+        left: 1.5rem;
+        right: 1.5rem;
+        top: calc(100% - 0.25rem);
+        z-index: 100;
+        background: #111;
+        border: 1px solid var(--pos-border);
+        max-height: 320px;
+        overflow-y: auto;
+        display: none;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .pos-suggest-list.show { display: block; }
+
+    .pos-suggest-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 1rem;
+        cursor: pointer;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        transition: background 0.15s;
+    }
+
+    .pos-suggest-item:hover,
+    .pos-suggest-item.active {
+        background: rgba(201, 169, 98, 0.12);
+    }
+
+    .pos-suggest-thumb {
+        width: 44px;
+        height: 44px;
+        object-fit: cover;
+        border: 1px solid var(--pos-border);
+        background: #1a1a1a;
+    }
+
+    .pos-suggest-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .pos-suggest-meta {
+        font-size: 0.75rem;
+        color: var(--pos-muted);
+    }
+
+    .pos-cart-area {
+        flex: 1;
+        overflow: auto;
+        padding: 0 1.5rem 1rem;
+    }
+
+    .pos-cart-table {
+        width: 100%;
+        color: #fff;
+        font-size: 0.875rem;
+    }
+
+    .pos-cart-table thead th {
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.7rem;
+        color: var(--pos-muted);
+        border-bottom: 1px solid var(--pos-border);
+        padding: 0.75rem 0.5rem;
+        position: sticky;
+        top: 0;
+        background: #0a0a0a;
+    }
+
+    .pos-cart-table tbody td {
+        padding: 0.65rem 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        vertical-align: middle;
+    }
+
+    .pos-cart-empty {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--pos-muted);
+    }
+
+    .pos-cart-empty i {
+        font-size: 2.5rem;
+        opacity: 0.35;
+        margin-bottom: 0.75rem;
+    }
+
+    .pos-thumb {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+        border: 1px solid var(--pos-border);
+    }
+
+    .pos-qty-group {
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--pos-border);
+    }
+
+    .pos-qty-btn {
+        background: transparent;
+        border: none;
+        color: #fff;
+        width: 28px;
+        height: 28px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .pos-qty-btn:hover { background: rgba(255, 255, 255, 0.08); }
+
+    .pos-qty-val {
+        min-width: 32px;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .pos-btn-remove {
+        background: transparent;
+        border: none;
+        color: #e74c3c;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .pos-btn-remove:hover { color: #ff6b6b; }
+
+    .pos-panel-body {
+        padding: 1.25rem 1.5rem;
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .pos-label {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--pos-muted);
+        margin-bottom: 0.4rem;
+    }
+
+    .pos-input {
+        background: #111 !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        color: #fff !important;
+        border-radius: 0 !important;
+    }
+
+    .pos-input:focus {
+        border-color: rgba(255, 255, 255, 0.4) !important;
+        box-shadow: none !important;
+    }
+
+    .pos-customer-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--pos-border);
+        padding: 0.85rem 1rem;
+        margin-top: 0.75rem;
+    }
+
+    .pos-customer-name {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .pos-tier-badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: rgba(201, 169, 98, 0.15);
+        color: var(--pos-gold);
+        border: 1px solid rgba(201, 169, 98, 0.35);
+        margin-top: 0.35rem;
+    }
+
+    .pos-summary {
+        margin-top: 1.5rem;
+        border-top: 1px solid var(--pos-border);
+        padding-top: 1rem;
+    }
+
+    .pos-summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.35rem 0;
+        font-size: 0.95rem;
+    }
+
+    .pos-summary-row.total {
+        font-size: 1.35rem;
+        font-weight: 700;
+        font-family: 'Montserrat', sans-serif;
+        color: var(--pos-accent);
+        margin-top: 0.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px dashed rgba(255, 255, 255, 0.15);
+    }
+
+    .pos-summary-row.discount span:last-child {
+        color: var(--pos-gold);
+    }
+
+    .pos-payment-options {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+    }
+
+    .pos-pay-option {
+        flex: 1;
+        position: relative;
+    }
+
+    .pos-pay-option input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .pos-pay-label {
+        display: block;
+        text-align: center;
+        padding: 0.75rem;
+        border: 1px solid var(--pos-border);
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+    }
+
+    .pos-pay-option input:checked + .pos-pay-label {
+        border-color: var(--pos-gold);
+        background: rgba(201, 169, 98, 0.1);
+        color: var(--pos-gold);
+    }
+
+    .pos-checkout-btn {
+        width: 100%;
+        margin-top: 1.5rem;
+        padding: 1rem 1.5rem;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        font-size: 1rem;
+        border: none;
+        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        color: #fff;
+        cursor: pointer;
+        box-shadow: 0 8px 24px var(--pos-accent-glow);
+        transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    }
+
+    .pos-checkout-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 32px var(--pos-accent-glow);
+    }
+
+    .pos-checkout-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .pos-toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        z-index: 9999;
+        min-width: 280px;
+        padding: 0.85rem 1.25rem;
+        background: #111;
+        border: 1px solid var(--pos-border);
+        color: #fff;
+        display: none;
+        animation: posFadeIn 0.25s ease;
+    }
+
+    .pos-toast.success { border-left: 4px solid var(--pos-accent); }
+    .pos-toast.error { border-left: 4px solid #e74c3c; }
+
+    @@keyframes posFadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @@media (max-width: 991px) {
+        .pos-shell { flex-direction: column; }
+        .pos-left, .pos-right {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        .pos-left { border-right: none; border-bottom: 1px solid var(--pos-border); }
+    }
+</style>
+
+<div class="pos-page">
+    <div class="pos-shell">
+        <!-- Cột trái: Tìm kiếm + Giỏ -->
+        <div class="pos-left">
+            <div class="pos-header">
+                <h1 class="pos-title"><i class="fas fa-cash-register me-2"></i> POS — Bán tại quầy</h1>
+                <p class="pos-subtitle">Quét hoặc gõ tên mô hình để thêm vào hóa đơn</p>
+            </div>
+
+            <div class="pos-search-wrap">
+                <i class="fas fa-search pos-search-icon"></i>
+                <input type="text"
+                       id="posProductSearch"
+                       class="form-control pos-search-input"
+                       placeholder="Tìm sản phẩm theo tên mô hình..."
+                       autocomplete="off"
+                       autofocus />
+                <div id="posSuggestList" class="pos-suggest-list"></div>
+            </div>
+
+            <div class="pos-cart-area">
+                <table class="pos-cart-table">
+                    <thead>
+                        <tr>
+                            <th style="width:56px">Ảnh</th>
+                            <th>Tên sản phẩm</th>
+                            <th style="width:110px">SL</th>
+                            <th style="width:100px" class="text-end">Giá</th>
+                            <th style="width:110px" class="text-end">Thành tiền</th>
+                            <th style="width:44px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="posCartBody">
+                        <tr id="posCartEmpty">
+                            <td colspan="6">
+                                <div class="pos-cart-empty">
+                                    <div><i class="fas fa-shopping-basket"></i></div>
+                                    <div>Chưa có sản phẩm — hãy tìm và thêm vào hóa đơn</div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Cột phải: Khách hàng + Thanh toán -->
+        <div class="pos-right">
+            <div class="pos-header">
+                <h2 class="pos-title">Thanh toán</h2>
+            </div>
+
+            <div class="pos-panel-body">
+                <label class="pos-label" for="posCustomerPhone">Khách hàng (SĐT)</label>
+                <div class="input-group">
+                    <input type="tel"
+                           id="posCustomerPhone"
+                           class="form-control pos-input"
+                           placeholder="Nhập SĐT để tra hạng thẻ..."
+                           maxlength="20" />
+                    <button type="button" class="btn btn-outline-light" id="posLookupBtn" style="border-radius:0">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div class="pos-customer-card" id="posCustomerInfo">
+                    <div class="pos-customer-name" id="posCustomerName">Khách vãng lai</div>
+                    <div class="text-muted small" id="posCustomerPhoneDisplay">—</div>
+                    <div id="posTierWrap" class="d-none">
+                        <span class="pos-tier-badge" id="posTierBadge"></span>
+                    </div>
+                </div>
+
+                <div class="pos-summary">
+                    <div class="pos-summary-row">
+                        <span>Tạm tính</span>
+                        <span id="posSubtotal">0 ₫</span>
+                    </div>
+                    <div class="pos-summary-row discount">
+                        <span>Giảm giá hạng thẻ</span>
+                        <span id="posMembershipDiscount">- 0 ₫</span>
+                    </div>
+                    <div class="pos-summary-row total">
+                        <span>Tổng thu</span>
+                        <span id="posGrandTotal">0 ₫</span>
+                    </div>
+                </div>
+
+                <div class="pos-label mt-4">Phương thức thanh toán</div>
+                <div class="pos-payment-options">
+                    <label class="pos-pay-option">
+                        <input type="radio" name="posPayment" value="Tiền mặt" checked />
+                        <span class="pos-pay-label"><i class="fas fa-money-bill-wave me-1"></i> Tiền mặt</span>
+                    </label>
+                    <label class="pos-pay-option">
+                        <input type="radio" name="posPayment" value="Chuyển khoản (QR)" />
+                        <span class="pos-pay-label"><i class="fas fa-qrcode me-1"></i> Chuyển khoản (QR)</span>
+                    </label>
+                </div>
+
+                <button type="button" class="pos-checkout-btn" id="posCheckoutBtn" disabled>
+                    <i class="fas fa-check-circle me-2"></i> Hoàn tất thanh toán
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="posToast" class="pos-toast"></div>
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    const cart = [];
+    let customer = {
+        id: null,
+        name: 'Khách vãng lai',
+        phone: '',
+        discountPercent: 0,
+        tierName: ''
+    };
+
+    let searchTimer = null;
+    let suggestIndex = -1;
+    let currentSuggestions = [];
+    let isSubmitting = false;
+
+    const els = {
+        search: document.getElementById('posProductSearch'),
+        suggestList: document.getElementById('posSuggestList'),
+        cartBody: document.getElementById('posCartBody'),
+        cartEmpty: document.getElementById('posCartEmpty'),
+        subtotal: document.getElementById('posSubtotal'),
+        membershipDiscount: document.getElementById('posMembershipDiscount'),
+        grandTotal: document.getElementById('posGrandTotal'),
+        checkoutBtn: document.getElementById('posCheckoutBtn'),
+        customerPhone: document.getElementById('posCustomerPhone'),
+        lookupBtn: document.getElementById('posLookupBtn'),
+        customerName: document.getElementById('posCustomerName'),
+        customerPhoneDisplay: document.getElementById('posCustomerPhoneDisplay'),
+        tierWrap: document.getElementById('posTierWrap'),
+        tierBadge: document.getElementById('posTierBadge'),
+        toast: document.getElementById('posToast')
+    };
+
+    function formatVnd(n) {
+        return Math.round(n).toLocaleString('vi-VN') + ' ₫';
+    }
+
+    function showToast(msg, type) {
+        els.toast.textContent = msg;
+        els.toast.className = 'pos-toast ' + (type || 'success');
+        els.toast.style.display = 'block';
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(function () { els.toast.style.display = 'none'; }, 4000);
+    }
+
+    function recalcTotals() {
+        let subtotal = 0;
+        cart.forEach(function (item) {
+            subtotal += item.price * item.quantity;
+        });
+
+        const discount = customer.discountPercent > 0
+            ? subtotal * (customer.discountPercent / 100)
+            : 0;
+        const total = Math.max(0, subtotal - discount);
+
+        els.subtotal.textContent = formatVnd(subtotal);
+        els.membershipDiscount.textContent = '- ' + formatVnd(discount);
+        els.grandTotal.textContent = formatVnd(total);
+        els.checkoutBtn.disabled = cart.length === 0 || isSubmitting;
+
+        return { subtotal, discount, total };
+    }
+
+    function renderCart() {
+        if (cart.length === 0) {
+            els.cartBody.innerHTML = '';
+            els.cartBody.appendChild(els.cartEmpty);
+            els.cartEmpty.style.display = '';
+            recalcTotals();
+            return;
+        }
+
+        if (els.cartEmpty.parentNode) {
+            els.cartEmpty.remove();
+        }
+
+        const frag = document.createDocumentFragment();
+        cart.forEach(function (item) {
+            const tr = document.createElement('tr');
+            tr.dataset.productId = item.productId;
+
+            const imgSrc = item.imageUrl || '/images/no-image.png';
+            const lineTotal = item.price * item.quantity;
+
+            tr.innerHTML =
+                '<td><img src="' + escapeAttr(imgSrc) + '" alt="" class="pos-thumb" onerror="this.src=\'/images/no-image.png\'" /></td>' +
+                '<td><div class="fw-medium">' + escapeHtml(item.productName) + '</div>' +
+                '<div class="text-muted small">Tồn: ' + item.stock + '</div></td>' +
+                '<td><div class="pos-qty-group">' +
+                '<button type="button" class="pos-qty-btn" data-action="dec" data-id="' + item.productId + '">−</button>' +
+                '<span class="pos-qty-val">' + item.quantity + '</span>' +
+                '<button type="button" class="pos-qty-btn" data-action="inc" data-id="' + item.productId + '">+</button>' +
+                '</div></td>' +
+                '<td class="text-end">' + formatVnd(item.price) + '</td>' +
+                '<td class="text-end fw-semibold">' + formatVnd(lineTotal) + '</td>' +
+                '<td><button type="button" class="pos-btn-remove" data-action="remove" data-id="' + item.productId + '" title="Xóa"><i class="fas fa-times"></i></button></td>';
+
+            frag.appendChild(tr);
+        });
+
+        els.cartBody.innerHTML = '';
+        els.cartBody.appendChild(frag);
+        recalcTotals();
+    }
+
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function escapeAttr(s) {
+        return String(s).replace(/"/g, '&quot;');
+    }
+
+    function addToCart(product) {
+        if (!product || product.stock <= 0) {
+            showToast('Sản phẩm hết hàng.', 'error');
+            return;
+        }
+
+        const existing = cart.find(function (x) { return x.productId === product.productId; });
+        if (existing) {
+            if (existing.quantity >= product.stock) {
+                showToast('Đã đạt số lượng tồn kho tối đa.', 'error');
+                return;
+            }
+            existing.quantity += 1;
+            existing.stock = product.stock;
+        } else {
+            cart.push({
+                productId: product.productId,
+                productName: product.productName,
+                imageUrl: product.imageUrl,
+                price: product.price,
+                stock: product.stock,
+                quantity: 1
+            });
+        }
+
+        renderCart();
+        els.search.value = '';
+        hideSuggestions();
+        els.search.focus();
+    }
+
+    function changeQty(productId, delta) {
+        const item = cart.find(function (x) { return x.productId === productId; });
+        if (!item) return;
+
+        const next = item.quantity + delta;
+        if (next <= 0) {
+            removeFromCart(productId);
+            return;
+        }
+        if (next > item.stock) {
+            showToast('Vượt quá tồn kho (' + item.stock + ').', 'error');
+            return;
+        }
+        item.quantity = next;
+        renderCart();
+    }
+
+    function removeFromCart(productId) {
+        const idx = cart.findIndex(function (x) { return x.productId === productId; });
+        if (idx >= 0) cart.splice(idx, 1);
+        renderCart();
+    }
+
+    function hideSuggestions() {
+        els.suggestList.classList.remove('show');
+        els.suggestList.innerHTML = '';
+        suggestIndex = -1;
+        currentSuggestions = [];
+    }
+
+    function renderSuggestions(items) {
+        currentSuggestions = items || [];
+        suggestIndex = -1;
+
+        if (!currentSuggestions.length) {
+            hideSuggestions();
+            return;
+        }
+
+        els.suggestList.innerHTML = currentSuggestions.map(function (p, i) {
+            const img = p.imageUrl || '/images/no-image.png';
+            return '<div class="pos-suggest-item" data-index="' + i + '">' +
+                '<img src="' + escapeAttr(img) + '" class="pos-suggest-thumb" onerror="this.src=\'/images/no-image.png\'" />' +
+                '<div><div class="pos-suggest-name">' + escapeHtml(p.productName) + '</div>' +
+                '<div class="pos-suggest-meta">' + formatVnd(p.price) + ' · Tồn: ' + p.stock + '</div></div></div>';
+        }).join('');
+
+        els.suggestList.classList.add('show');
+    }
+
+    function fetchSuggestions(keyword) {
+        fetch('/Pos/SearchProducts?query=' + encodeURIComponent(keyword), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (r) { return r.json(); })
+            .then(renderSuggestions)
+            .catch(function () { hideSuggestions(); });
+    }
+
+    function selectSuggestionByIndex(idx) {
+        if (idx < 0 || idx >= currentSuggestions.length) return;
+        addToCart(currentSuggestions[idx]);
+    }
+
+    function highlightSuggestion(idx) {
+        const nodes = els.suggestList.querySelectorAll('.pos-suggest-item');
+        nodes.forEach(function (n, i) {
+            n.classList.toggle('active', i === idx);
+        });
+    }
+
+    function resetCustomerWalkIn() {
+        customer = {
+            id: null,
+            name: 'Khách vãng lai',
+            phone: '',
+            discountPercent: 0,
+            tierName: ''
+        };
+        els.customerName.textContent = customer.name;
+        els.customerPhoneDisplay.textContent = '—';
+        els.tierWrap.classList.add('d-none');
+        recalcTotals();
+    }
+
+    function applyCustomer(data) {
+        customer.id = data.customerId;
+        customer.name = data.fullName;
+        customer.phone = data.phone || '';
+        customer.discountPercent = data.discountPercent || 0;
+        customer.tierName = data.tierName || '';
+
+        els.customerName.textContent = customer.name;
+        els.customerPhoneDisplay.textContent = customer.phone || '—';
+
+        if (customer.discountPercent > 0) {
+            els.tierWrap.classList.remove('d-none');
+            els.tierBadge.textContent = customer.tierName + ' (-' + customer.discountPercent + '%)';
+        } else {
+            els.tierWrap.classList.remove('d-none');
+            els.tierBadge.textContent = customer.tierName;
+        }
+
+        recalcTotals();
+        showToast('Đã tìm thấy khách: ' + customer.name, 'success');
+    }
+
+    function lookupCustomer() {
+        const phone = els.customerPhone.value.trim();
+        if (!phone) {
+            resetCustomerWalkIn();
+            return;
+        }
+
+        fetch('/Pos/LookupCustomer?phone=' + encodeURIComponent(phone), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.found) {
+                    applyCustomer(data);
+                } else {
+                    resetCustomerWalkIn();
+                    showToast(data.message || 'Không tìm thấy khách.', 'error');
+                }
+            })
+            .catch(function () {
+                showToast('Lỗi tra cứu khách hàng.', 'error');
+            });
+    }
+
+    function getPaymentMethod() {
+        const checked = document.querySelector('input[name="posPayment"]:checked');
+        return checked ? checked.value : 'Tiền mặt';
+    }
+
+    function submitOrder() {
+        if (cart.length === 0 || isSubmitting) return;
+
+        isSubmitting = true;
+        els.checkoutBtn.disabled = true;
+        els.checkoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Đang xử lý...';
+
+        const payload = {
+            customerId: customer.id,
+            paymentMethod: getPaymentMethod(),
+            items: cart.map(function (item) {
+                return {
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    unitPrice: item.price
+                };
+            })
+        };
+
+        fetch('/Pos/CreatePosOrder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    showToast('Đơn #' + data.orderId + ' — ' + data.message, 'success');
+                    cart.length = 0;
+                    renderCart();
+                    els.search.focus();
+                } else {
+                    showToast(data.message || 'Thanh toán thất bại.', 'error');
+                }
+            })
+            .catch(function () {
+                showToast('Lỗi kết nối máy chủ.', 'error');
+            })
+            .finally(function () {
+                isSubmitting = false;
+                els.checkoutBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i> Hoàn tất thanh toán';
+                recalcTotals();
+            });
+    }
+
+    // Events — tìm kiếm
+    els.search.addEventListener('input', function () {
+        const kw = els.search.value.trim();
+        clearTimeout(searchTimer);
+        if (kw.length < 1) {
+            hideSuggestions();
+            return;
+        }
+        searchTimer = setTimeout(function () { fetchSuggestions(kw); }, 220);
+    });
+
+    els.search.addEventListener('keydown', function (e) {
+        if (!currentSuggestions.length) {
+            if (e.key === 'Enter') e.preventDefault();
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            suggestIndex = Math.min(suggestIndex + 1, currentSuggestions.length - 1);
+            highlightSuggestion(suggestIndex);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            suggestIndex = Math.max(suggestIndex - 1, 0);
+            highlightSuggestion(suggestIndex);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (suggestIndex >= 0) {
+                selectSuggestionByIndex(suggestIndex);
+            } else if (currentSuggestions.length === 1) {
+                selectSuggestionByIndex(0);
+            }
+        } else if (e.key === 'Escape') {
+            hideSuggestions();
+        }
+    });
+
+    els.suggestList.addEventListener('click', function (e) {
+        const item = e.target.closest('.pos-suggest-item');
+        if (!item) return;
+        const idx = parseInt(item.dataset.index, 10);
+        selectSuggestionByIndex(idx);
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('.pos-search-wrap')) {
+            hideSuggestions();
+        }
+    });
+
+    // Events — giỏ hàng
+    els.cartBody.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const id = parseInt(btn.dataset.id, 10);
+        const action = btn.dataset.action;
+        if (action === 'inc') changeQty(id, 1);
+        else if (action === 'dec') changeQty(id, -1);
+        else if (action === 'remove') removeFromCart(id);
+    });
+
+    // Events — khách hàng
+    els.lookupBtn.addEventListener('click', lookupCustomer);
+    els.customerPhone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            lookupCustomer();
+        }
+    });
+    els.customerPhone.addEventListener('blur', function () {
+        if (!els.customerPhone.value.trim()) {
+            resetCustomerWalkIn();
+        }
+    });
+
+    els.checkoutBtn.addEventListener('click', submitOrder);
+
+    renderCart();
+})();
+</script>
+}

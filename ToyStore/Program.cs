@@ -14,6 +14,7 @@ using ToyStore.Infrastructure.UnitOfWork;
 using ToyStore.Middleware;
 using ToyStore.Scripts;
 using ToyStore.Models;
+using ToyStore.Hubs;
 using ToyStore.Services;
 
 namespace ToyStore
@@ -84,6 +85,20 @@ namespace ToyStore
 
             // Cấu hình VNPAY Sandbox
             builder.Services.Configure<VnPaySettings>(builder.Configuration.GetSection("VnPay"));
+            builder.Services.Configure<GhnSettings>(builder.Configuration.GetSection("Ghn"));
+
+            builder.Services.AddHttpClient<IGhnService, GhnService>((sp, client) =>
+            {
+                var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GhnSettings>>().Value;
+                var baseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl)
+                    ? "https://dev-online-gateway.ghn.vn"
+                    : settings.BaseUrl.TrimEnd('/');
+                client.BaseAddress = new Uri(baseUrl + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+            builder.Services.AddScoped<GhnOrderShippingService>();
+            builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
             // Đăng ký Adapter cho cổng thanh toán (Payment Gateway)
             builder.Services.AddScoped<IPaymentGateway, MockPaymentGatewayAdapter>();
@@ -96,6 +111,7 @@ namespace ToyStore
 
             builder.Services.AddControllersWithViews();
             builder.Services.AddRazorPages();
+            builder.Services.AddSignalR();
 
             var app = builder.Build();
 
@@ -119,6 +135,8 @@ namespace ToyStore
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
+
+            app.MapHub<SupportHub>("/supporthub");
 
             app.MapRazorPages();
 

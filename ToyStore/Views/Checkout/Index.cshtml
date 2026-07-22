@@ -1,0 +1,674 @@
+@model ToyStore.Models.CheckoutPageViewModel
+@using ToyStore.Helpers
+
+@{
+    ViewData["Title"] = "Thanh toán";
+    var cart = ViewBag.Cart as ToyStore.Models.ShoppingCart ?? new ToyStore.Models.ShoppingCart();
+    var subTotal = (decimal)(ViewBag.SubTotal ?? cart.Subtotal);
+    var discountValue = (decimal)(ViewBag.DiscountValue ?? 0m);
+    var membershipDiscountValue = (decimal)(ViewBag.MembershipDiscountValue ?? 0m);
+    var tierName = ViewBag.TierName as string;
+    var baseFinalTotal = (decimal)(ViewBag.FinalTotal ?? cart.Total);
+    var fallbackShippingFee = (decimal)(ViewBag.FallbackShippingFee ?? 30000m);
+    var maxCodAmount = (decimal)(ViewBag.MaxCodAmount ?? GhnCodHelper.DefaultMaxCodAmount);
+    var ghnCodLimitMessage = ViewBag.GhnCodLimitMessage as string
+        ?? GhnCodHelper.GetLargeOrderNoticeMessage(maxCodAmount);
+    var ghnCodConfirmMessage = ViewBag.GhnCodConfirmMessage as string
+        ?? GhnCodHelper.GetLargeOrderConfirmMessage();
+}
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card checkout-main-card">
+                <div class="card-header checkout-main-header">
+                    <h4 class="mb-0"><i class="fas fa-credit-card me-2"></i> Thông tin thanh toán</h4>
+                </div>
+                <div class="card-body">
+                    <form asp-controller="Order" asp-action="Create" method="post" id="checkoutForm">
+                        @Html.AntiForgeryToken()
+
+                        <input type="hidden" name="ghnProvinceId" id="ghnProvinceId" value="" />
+                        <input type="hidden" name="ghnDistrictId" id="ghnDistrictId" value="" />
+                        <input type="hidden" name="ghnWardCode" id="ghnWardCode" value="" />
+                        <input type="hidden" name="shippingFee" id="shippingFee" value="0" />
+                        <input type="hidden" name="shippingAddress" id="shippingAddress" value="" />
+
+                        <div id="ghnWarningBox" class="alert checkout-info-alert mb-3 d-none" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="ghnWarningText"></span>
+                        </div>
+
+                        <div id="codLimitBox" class="alert checkout-info-alert mb-3 d-none" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <span id="codLimitText"></span>
+                        </div>
+
+                        @if (Model.IsLoggedIn && Model.Customer != null)
+                        {
+                            <div class="alert checkout-info-alert mb-4">
+                                <h6 class="checkout-info-title">
+                                    <i class="fas fa-user-check me-2"></i> Thông tin giao hàng (tài khoản)
+                                </h6>
+                                <p class="checkout-info-text mb-1"><strong>@Model.Customer.FullName</strong></p>
+                                <p class="checkout-info-text mb-1">@Model.Customer.Email</p>
+                                <p class="checkout-info-text mb-0">@(Model.Customer.Phone ?? "—")</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert checkout-info-alert mb-3">
+                                <h6 class="checkout-info-title">
+                                    <i class="fas fa-user-clock me-2"></i> Mua hàng không cần đăng ký
+                                </h6>
+                                <p class="checkout-info-text mb-0">
+                                    Nhập thông tin bên dưới để giao hàng. Đã có tài khoản?
+                                    <a asp-controller="Auth" asp-action="Login" class="alert-link">Đăng nhập</a>
+                                </p>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestFullName">Họ và tên *</label>
+                                    <input type="text" class="form-control checkout-form-input" id="guestFullName"
+                                           name="guestFullName" value="@Model.Guest.FullName" required maxlength="100" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestEmail">Email *</label>
+                                    <input type="email" class="form-control checkout-form-input" id="guestEmail"
+                                           name="guestEmail" value="@Model.Guest.Email" required maxlength="100" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label checkout-form-label" for="guestPhone">Số điện thoại *</label>
+                                    <input type="tel" class="form-control checkout-form-input" id="guestPhone"
+                                           name="guestPhone" value="@Model.Guest.Phone" required maxlength="20" />
+                                </div>
+                            </div>
+                        }
+
+                        <div class="mb-4">
+                            <h6 class="checkout-form-label mb-3">
+                                <i class="fas fa-map-marker-alt me-2"></i> Địa chỉ giao hàng (GHN)
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label checkout-form-label" for="ghnProvince">Tỉnh / Thành *</label>
+                                    <select id="ghnProvince" class="form-select checkout-form-select" required>
+                                        <option value="">-- Chọn tỉnh/thành --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label checkout-form-label" for="ghnDistrict">Quận / Huyện *</label>
+                                    <select id="ghnDistrict" class="form-select checkout-form-select" required disabled>
+                                        <option value="">-- Chọn quận/huyện --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label checkout-form-label" for="ghnWard">Phường / Xã *</label>
+                                    <select id="ghnWard" class="form-select checkout-form-select" required disabled>
+                                        <option value="">-- Chọn phường/xã --</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label checkout-form-label" for="deliveryStreet">Số nhà, đường *</label>
+                                    @if (Model.IsLoggedIn)
+                                    {
+                                        <input type="text" class="form-control checkout-form-input" id="deliveryStreet"
+                                               name="deliveryStreet" value="" required maxlength="255"
+                                               placeholder="VD: 123 Nguyễn Huệ" />
+                                    }
+                                    else
+                                    {
+                                        <input type="text" class="form-control checkout-form-input" id="deliveryStreet"
+                                               name="deliveryStreet" value="@Model.Guest.Address" required maxlength="255"
+                                               placeholder="VD: 123 Nguyễn Huệ" />
+                                        <input type="hidden" name="guestAddress" id="guestAddress" value="@Model.Guest.Address" />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-4">
+                                    <label class="form-label checkout-form-label" for="paymentMethod">
+                                        <i class="fas fa-credit-card me-2"></i>Phương thức thanh toán
+                                    </label>
+                                    <select name="paymentMethod" id="paymentMethod" class="form-select checkout-form-select">
+                                        <option value="COD" selected>Thanh toán khi nhận hàng (COD)</option>
+                                        <option value="BankTransfer">Chuyển khoản ngân hàng</option>
+                                        <option value="VNPAY">Thanh toán VNPAY (Thẻ/QR)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between checkout-actions">
+                            <a href="/Cart" class="btn checkout-btn-back">
+                                <i class="fas fa-arrow-left me-2"></i> Quay lại giỏ hàng
+                            </a>
+                            <button type="submit" class="btn checkout-btn-confirm btn-lg" id="btnSubmitOrder">
+                                <i class="fas fa-check me-2"></i> Đặt hàng ngay
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card checkout-summary-card">
+                <div class="card-header checkout-summary-header">
+                    <h5 class="mb-0"><i class="fas fa-shopping-bag me-2"></i>Đơn hàng của bạn</h5>
+                </div>
+                <div class="card-body">
+                    @foreach (var item in cart.Items)
+                    {
+                        <div class="d-flex align-items-center mb-3 checkout-item-row">
+                            <div class="me-3 flex-shrink-0">
+                                @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                {
+                                    <img src="@item.ImageUrl" alt="@item.ProductName" class="checkout-product-image">
+                                }
+                                else
+                                {
+                                    <div class="checkout-image-placeholder">
+                                        <i class="fas fa-image"></i>
+                                    </div>
+                                }
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center flex-grow-1">
+                                <div class="pe-3 checkout-item-info">
+                                    <small class="d-block checkout-product-name">@item.ProductName</small>
+                                    <small class="checkout-product-quantity">Số lượng: @item.Quantity</small>
+                                </div>
+                                <div class="text-end text-success fw-bold text-nowrap checkout-product-price">
+                                    @item.Total.ToString("N0") ₫
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <hr class="checkout-divider">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="checkout-summary-label">Tạm tính:</span>
+                        <span class="checkout-summary-value text-nowrap">@subTotal.ToString("N0") ₫</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="checkout-summary-label">Khuyến mãi:</span>
+                        <span class="checkout-summary-value text-nowrap">-@discountValue.ToString("N0") ₫</span>
+                    </div>
+                    @if (membershipDiscountValue > 0 && !string.IsNullOrEmpty(tierName))
+                    {
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="checkout-summary-label">Ưu đãi hạng thẻ (@tierName):</span>
+                            <span class="checkout-summary-value text-success fw-bold text-nowrap">- @membershipDiscountValue.ToString("N0") ₫</span>
+                        </div>
+                    }
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="checkout-summary-label">Phí vận chuyển:</span>
+                        <span class="checkout-summary-value text-nowrap d-flex align-items-center gap-2">
+                            <span id="shippingSpinner" class="checkout-shipping-spinner" hidden>
+                                <span class="spinner-border spinner-border-sm text-light" role="status"></span>
+                            </span>
+                            <span id="shippingFeeDisplay">Chưa tính</span>
+                        </span>
+                    </div>
+                    <hr class="checkout-divider">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong class="checkout-total-label">Tổng cộng:</strong>
+                        <strong class="checkout-total-value text-nowrap" id="grandTotalDisplay">@baseFinalTotal.ToString("N0") ₫</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .checkout-main-card,
+    .checkout-summary-card {
+        background: var(--lux-surface, #111) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .checkout-main-header,
+    .checkout-summary-header {
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+    }
+
+    .checkout-form-label {
+        color: var(--lux-muted, #b3b3b3) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-size: 0.78rem;
+    }
+
+    .checkout-form-select,
+    .checkout-form-input {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+        padding: 0.75rem;
+    }
+
+    .checkout-form-select:focus,
+    .checkout-form-input:focus {
+        background: transparent !important;
+        border-color: var(--lux-white, #fff) !important;
+        box-shadow: none !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    /* Danh sách option: nền sáng + chữ tối để đọc được trên Windows/Chrome. */
+    .checkout-form-select option {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+
+    .checkout-form-select option:checked,
+    .checkout-form-select option:hover {
+        background-color: #0d6efd !important;
+        color: #ffffff !important;
+    }
+
+    .checkout-form-select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        background-size: 16px 12px !important;
+    }
+
+    .checkout-info-alert {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-left: 2px solid var(--lux-white, #fff) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0;
+        padding: 1rem;
+    }
+
+    .checkout-info-title { color: var(--lux-white, #fff) !important; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; }
+    .checkout-info-text { color: var(--lux-muted, #b3b3b3) !important; }
+    .checkout-info-alert .alert-link { color: var(--lux-white, #fff) !important; text-decoration: underline; }
+
+    .checkout-btn-back,
+    .checkout-btn-confirm {
+        background: transparent !important;
+        border: 1px solid var(--lux-white, #fff) !important;
+        color: var(--lux-white, #fff) !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        border-radius: 0;
+        padding: 0.85rem 2rem;
+        transition: all 0.4s ease;
+    }
+
+    .checkout-btn-back {
+        border-color: var(--lux-line, rgba(255,255,255,0.25)) !important;
+        color: var(--lux-muted, #b3b3b3) !important;
+    }
+
+    .checkout-btn-confirm {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
+    }
+
+    .checkout-btn-confirm:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    .checkout-btn-back:hover {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
+        border-color: var(--lux-white, #fff) !important;
+    }
+
+    .checkout-btn-confirm:hover:not(:disabled) {
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .checkout-item-info { min-width: 0; max-width: 65%; }
+    .checkout-product-name { color: var(--lux-white, #fff) !important; font-weight: 500; line-height: 1.3; }
+    .checkout-product-quantity { color: var(--lux-muted, #b3b3b3) !important; }
+    .checkout-product-price { color: #4ade80 !important; }
+    .checkout-summary-label { color: var(--lux-muted, #b3b3b3) !important; }
+    .checkout-summary-value { color: var(--lux-white, #fff) !important; }
+    .checkout-total-label { color: var(--lux-white, #fff) !important; }
+    .checkout-total-value { color: var(--lux-white, #fff) !important; font-size: 1.3rem; }
+    .checkout-divider { border-color: var(--lux-line, rgba(255,255,255,0.12)) !important; }
+
+    .checkout-product-image {
+        width: 60px; height: 60px; object-fit: cover;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)); border-radius: 4px;
+    }
+
+    .checkout-image-placeholder {
+        width: 60px; height: 60px;
+        background: var(--lux-bg, #0a0a0a);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)); border-radius: 4px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .checkout-shipping-spinner .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        (function () {
+            const baseFinalTotal = @baseFinalTotal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            const fallbackFee = @fallbackShippingFee.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            const maxCodAmount = @maxCodAmount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            const codLimitMessage = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ghnCodLimitMessage));
+            const codConfirmMessage = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ghnCodConfirmMessage));
+
+            const provinceSelect = document.getElementById('ghnProvince');
+            const districtSelect = document.getElementById('ghnDistrict');
+            const wardSelect = document.getElementById('ghnWard');
+            const districtHidden = document.getElementById('ghnDistrictId');
+            const provinceHidden = document.getElementById('ghnProvinceId');
+            const wardHidden = document.getElementById('ghnWardCode');
+            const shippingFeeInput = document.getElementById('shippingFee');
+            const shippingFeeDisplay = document.getElementById('shippingFeeDisplay');
+            const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+            const shippingSpinner = document.getElementById('shippingSpinner');
+            const btnSubmit = document.getElementById('btnSubmitOrder');
+            const checkoutForm = document.getElementById('checkoutForm');
+            const guestAddressHidden = document.getElementById('guestAddress');
+            const deliveryStreet = document.getElementById('deliveryStreet');
+            const shippingAddressHidden = document.getElementById('shippingAddress');
+            const ghnWarningBox = document.getElementById('ghnWarningBox');
+            const ghnWarningText = document.getElementById('ghnWarningText');
+            const codLimitBox = document.getElementById('codLimitBox');
+            const codLimitText = document.getElementById('codLimitText');
+            const paymentMethodSelect = document.getElementById('paymentMethod');
+
+            let currentShippingFee = 0;
+            let feeRequestSeq = 0;
+
+            function showGhnWarning(message) {
+                if (!ghnWarningBox || !ghnWarningText || !message) return;
+                ghnWarningText.textContent = message;
+                ghnWarningBox.classList.remove('d-none');
+            }
+
+            function selectedOptionText(select) {
+                if (!select || select.selectedIndex <= 0) return '';
+                return select.options[select.selectedIndex].text.trim();
+            }
+
+            function updateShippingAddressHidden() {
+                if (!shippingAddressHidden) return;
+                const parts = [
+                    deliveryStreet ? deliveryStreet.value.trim() : '',
+                    selectedOptionText(wardSelect),
+                    selectedOptionText(districtSelect),
+                    selectedOptionText(provinceSelect)
+                ].filter(Boolean);
+                shippingAddressHidden.value = parts.join(', ');
+            }
+
+            function formatVnd(amount) {
+                return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + ' ₫';
+            }
+
+            function updateGrandTotal() {
+                grandTotalDisplay.textContent = formatVnd(baseFinalTotal + currentShippingFee);
+                updateCodLimitNotice();
+            }
+
+            function isCodPaymentSelected() {
+                if (!paymentMethodSelect) return true;
+                return (paymentMethodSelect.value || 'COD').toUpperCase() === 'COD';
+            }
+
+            function getGrandTotalAmount() {
+                return baseFinalTotal + currentShippingFee;
+            }
+
+            function isLargeCodOrder() {
+                return isCodPaymentSelected() && getGrandTotalAmount() > maxCodAmount;
+            }
+
+            function updateCodLimitNotice() {
+                if (!codLimitBox || !codLimitText) return;
+                if (isLargeCodOrder()) {
+                    codLimitText.textContent = codLimitMessage;
+                    codLimitBox.classList.remove('d-none');
+                } else {
+                    largeCodConfirmed = false;
+                    codLimitBox.classList.add('d-none');
+                    codLimitText.textContent = '';
+                }
+            }
+
+            let largeCodConfirmed = false;
+
+            function setShippingLoading(isLoading) {
+                shippingSpinner.hidden = !isLoading;
+                btnSubmit.disabled = isLoading;
+            }
+
+            function resetDistricts() {
+                districtSelect.innerHTML = '<option value="">-- Chọn quận/huyện --</option>';
+                districtSelect.disabled = true;
+                resetWards();
+            }
+
+            function resetWards() {
+                wardSelect.innerHTML = '<option value="">-- Chọn phường/xã --</option>';
+                wardSelect.disabled = true;
+                districtHidden.value = '';
+                wardHidden.value = '';
+                currentShippingFee = 0;
+                shippingFeeInput.value = '0';
+                shippingFeeDisplay.textContent = 'Chưa tính';
+                updateGrandTotal();
+                updateShippingAddressHidden();
+            }
+
+            function pickField(item, keys) {
+                for (let i = 0; i < keys.length; i++) {
+                    const val = item[keys[i]];
+                    if (val !== undefined && val !== null && val !== '') return val;
+                }
+                return '';
+            }
+
+            function fillSelect(select, items, valueKeys, textKeys, placeholder) {
+                select.innerHTML = '<option value="">' + placeholder + '</option>';
+                (items || []).forEach(function (item) {
+                    const opt = document.createElement('option');
+                    opt.value = pickField(item, valueKeys);
+                    opt.textContent = pickField(item, textKeys);
+                    select.appendChild(opt);
+                });
+                select.disabled = !items || items.length === 0;
+            }
+
+            async function loadProvinces() {
+                try {
+                    const res = await fetch('/Checkout/Provinces');
+                    const json = await res.json();
+                    if (json.success && json.data && json.data.length) {
+                        fillSelect(provinceSelect, json.data, ['provinceId', 'ProvinceID'], ['provinceName', 'ProvinceName'], '-- Chọn tỉnh/thành --');
+                        if (json.isFallback && json.message) {
+                            showGhnWarning(json.message + ' Bạn vẫn có thể chọn địa chỉ mẫu để test checkout.');
+                        }
+                    } else {
+                        showGhnWarning('Không tải được danh sách Tỉnh/Thành. Kiểm tra Token GHN trong appsettings.json.');
+                    }
+                } catch (e) {
+                    console.warn('GHN provinces failed', e);
+                    showGhnWarning('Lỗi kết nối GHN. Vui lòng thử lại sau.');
+                }
+            }
+
+            provinceSelect.addEventListener('change', async function () {
+                resetDistricts();
+                if (provinceHidden) {
+                    provinceHidden.value = this.value || '';
+                }
+                updateShippingAddressHidden();
+                const provinceId = parseInt(this.value, 10);
+                if (!provinceId) return;
+
+                try {
+                    const res = await fetch('/Checkout/Districts?provinceId=' + provinceId);
+                    const json = await res.json();
+                    if (json.success && json.data) {
+                        fillSelect(districtSelect, json.data, ['districtId', 'DistrictID'], ['districtName', 'DistrictName'], '-- Chọn quận/huyện --');
+                    }
+                } catch (e) {
+                    console.warn('GHN districts failed', e);
+                }
+            });
+
+            districtSelect.addEventListener('change', async function () {
+                resetWards();
+                updateShippingAddressHidden();
+                const districtId = parseInt(this.value, 10);
+                if (!districtId) return;
+
+                districtHidden.value = String(districtId);
+
+                try {
+                    const res = await fetch('/Checkout/Wards?districtId=' + districtId);
+                    const json = await res.json();
+                    if (json.success && json.data) {
+                        fillSelect(wardSelect, json.data, ['wardCode', 'WardCode'], ['wardName', 'WardName'], '-- Chọn phường/xã --');
+                    }
+                } catch (e) {
+                    console.warn('GHN wards failed', e);
+                }
+            });
+
+            wardSelect.addEventListener('change', function () {
+                wardHidden.value = this.value || '';
+                updateShippingAddressHidden();
+                if (wardHidden.value && districtHidden.value) {
+                    calculateShippingFee();
+                }
+            });
+
+            if (deliveryStreet) {
+                deliveryStreet.addEventListener('input', updateShippingAddressHidden);
+            }
+
+            async function calculateShippingFee() {
+                const districtId = parseInt(districtHidden.value, 10);
+                const wardCode = wardHidden.value;
+                if (!districtId || !wardCode) return;
+
+                const seq = ++feeRequestSeq;
+                setShippingLoading(true);
+                shippingFeeDisplay.textContent = 'Đang tính...';
+
+                try {
+                    const params = new URLSearchParams();
+                    params.append('toDistrictId', districtId);
+                    params.append('toWardCode', wardCode);
+                    params.append('weight', '1000');
+
+                    const res = await fetch('/Checkout/CalculateFee', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: params.toString()
+                    });
+
+                    const json = await res.json();
+                    if (seq !== feeRequestSeq) return;
+
+                    currentShippingFee = json.fee != null ? Number(json.fee) : fallbackFee;
+                    if (isNaN(currentShippingFee) || currentShippingFee < 0) {
+                        currentShippingFee = fallbackFee;
+                    }
+
+                    shippingFeeInput.value = String(currentShippingFee);
+                    shippingFeeDisplay.textContent = formatVnd(currentShippingFee);
+                    if (json.isFallback) {
+                        shippingFeeDisplay.textContent += ' (mặc định)';
+                    }
+                } catch (e) {
+                    currentShippingFee = fallbackFee;
+                    shippingFeeInput.value = String(fallbackFee);
+                    shippingFeeDisplay.textContent = formatVnd(fallbackFee) + ' (mặc định)';
+                } finally {
+                    if (seq === feeRequestSeq) {
+                        setShippingLoading(false);
+                        updateGrandTotal();
+                    }
+                }
+            }
+
+            checkoutForm.addEventListener('submit', function (e) {
+                updateShippingAddressHidden();
+                if (guestAddressHidden && deliveryStreet) {
+                    guestAddressHidden.value = deliveryStreet.value;
+                }
+
+                if (!largeCodConfirmed && isLargeCodOrder()) {
+                    e.preventDefault();
+
+                    if (window.Swal) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Xác nhận đơn hàng',
+                            text: codConfirmMessage,
+                            showCancelButton: true,
+                            confirmButtonText: 'Tiếp tục đặt',
+                            cancelButtonText: 'Quay lại',
+                            confirmButtonColor: '#198754',
+                            reverseButtons: true
+                        }).then(function (result) {
+                            if (result.isConfirmed) {
+                                largeCodConfirmed = true;
+                                checkoutForm.requestSubmit();
+                            }
+                        });
+                    } else if (confirm(codConfirmMessage)) {
+                        largeCodConfirmed = true;
+                        checkoutForm.requestSubmit();
+                    }
+
+                    return;
+                }
+            });
+
+            if (paymentMethodSelect) {
+                paymentMethodSelect.addEventListener('change', function () {
+                    largeCodConfirmed = false;
+                    updateCodLimitNotice();
+                });
+            }
+
+            districtSelect.addEventListener('change', updateCodLimitNotice);
+            wardSelect.addEventListener('change', updateCodLimitNotice);
+
+            loadProvinces();
+            updateGrandTotal();
+        })();
+    </script>
+}

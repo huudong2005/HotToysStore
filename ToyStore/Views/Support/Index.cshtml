@@ -1,0 +1,551 @@
+@model IEnumerable<ToyStore.Domain.Entities.ChatSession>
+@{
+    ViewData["Title"] = "Trò chuyện hỗ trợ";
+    var staffName = Context.Session.GetString("FullName") ?? "Nhân viên";
+}
+
+<div class="support-page">
+    <div class="support-page__header mb-4">
+        <h2><i class="fas fa-headset me-2"></i>Trò chuyện hỗ trợ trực tuyến</h2>
+        <p class="support-page__subtitle">Quản lý yêu cầu hỗ trợ từ khách hàng theo thời gian thực</p>
+    </div>
+
+    <div class="support-layout">
+        <!-- Cột trái: Danh sách phiên -->
+        <aside class="support-sessions-panel">
+            <div class="support-panel__head">
+                <span><i class="fas fa-inbox me-2"></i>Yêu cầu hỗ trợ</span>
+                <span class="badge support-badge" id="sessionCount">@Model.Count()</span>
+            </div>
+            <div class="support-sessions-list" id="sessionList">
+                @if (Model.Any())
+                {
+                    foreach (var session in Model)
+                    {
+                        var statusClass = session.Status == "Pending" ? "status-pending" : "status-active";
+                        var statusLabel = session.Status == "Pending" ? "Chờ xử lý" : "Đang chat";
+                        <button type="button"
+                                class="support-session-item"
+                                data-session-id="@session.SessionId"
+                                data-customer-name="@session.CustomerName">
+                            <div class="support-session-item__name">@session.CustomerName</div>
+                            <div class="support-session-item__meta">
+                                <span class="support-session-status @statusClass">@statusLabel</span>
+                                <span class="support-session-time">@(session.CreatedAt?.ToString("dd/MM HH:mm") ?? "")</span>
+                            </div>
+                        </button>
+                    }
+                }
+                else
+                {
+                    <div class="support-empty" id="sessionEmpty">
+                        <i class="fas fa-comments fa-2x mb-2"></i>
+                        <p>Chưa có yêu cầu hỗ trợ nào</p>
+                    </div>
+                }
+            </div>
+        </aside>
+
+        <!-- Cột phải: Khung chat -->
+        <section class="support-chat-panel">
+            <div class="support-panel__head">
+                <div>
+                    <span id="chatCustomerLabel"><i class="fas fa-user me-2"></i>Chọn một yêu cầu để bắt đầu</span>
+                    <div class="support-chat-status" id="chatSessionStatus"></div>
+                </div>
+                <button type="button" id="btnCloseSession" class="btn btn-sm support-close-session" hidden>
+                    <i class="fas fa-phone-slash me-1"></i> Kết thúc phiên
+                </button>
+            </div>
+
+            <div class="support-chat-messages" id="adminChatMessages">
+                <div class="support-chat-placeholder">
+                    <i class="fas fa-comment-dots fa-3x mb-3"></i>
+                    <p>Chọn khách hàng bên trái để xem và trả lời tin nhắn</p>
+                </div>
+            </div>
+
+            <div class="support-chat-input-area">
+                <input type="text"
+                       id="adminChatInput"
+                       class="support-chat-input"
+                       placeholder="Nhập tin nhắn trả lời khách hàng..."
+                       autocomplete="off"
+                       disabled />
+                <button type="button" id="adminChatSend" class="support-chat-send" disabled aria-label="Gửi">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </section>
+    </div>
+</div>
+
+<style>
+    .support-page { color: var(--lux-white, #fff); }
+    .support-page__header h2 {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 300;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+    }
+    .support-page__subtitle { color: var(--lux-muted, #b3b3b3); margin: 0; }
+
+    .support-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 1rem;
+        min-height: calc(100vh - 220px);
+    }
+
+    .support-sessions-panel,
+    .support-chat-panel {
+        background: var(--lux-surface, #111);
+        border: 1px dashed var(--lux-line, rgba(255,255,255,0.2));
+        display: flex;
+        flex-direction: column;
+        min-height: 520px;
+    }
+
+    .support-panel__head {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px dashed var(--lux-line, rgba(255,255,255,0.15));
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.82rem;
+    }
+
+    .support-badge {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.3)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+    }
+
+    .support-close-session {
+        background: transparent !important;
+        border: 1px dashed rgba(255, 120, 120, 0.45) !important;
+        color: #ffb4b4 !important;
+        border-radius: 0 !important;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .support-close-session:hover:not(:disabled) {
+        background: rgba(255, 120, 120, 0.12) !important;
+        color: #ffd0d0 !important;
+        border-color: rgba(255, 120, 120, 0.7) !important;
+    }
+
+    .support-sessions-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.75rem;
+        scrollbar-width: thin;
+    }
+
+    .support-session-item {
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: 1px dashed var(--lux-line, rgba(255,255,255,0.15));
+        color: var(--lux-white, #fff);
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.65rem;
+        cursor: pointer;
+        transition: border-color 0.3s ease, background 0.3s ease;
+    }
+
+    .support-session-item:hover,
+    .support-session-item.is-active {
+        border-color: var(--lux-white, #fff);
+        background: rgba(255,255,255,0.04);
+    }
+
+    .support-session-item__name {
+        font-weight: 500;
+        margin-bottom: 0.35rem;
+    }
+
+    .support-session-item__meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.75rem;
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .support-session-status.status-pending { color: #fbbf24; }
+    .support-session-status.status-active { color: #4ade80; }
+
+    .support-empty {
+        text-align: center;
+        color: var(--lux-muted, #b3b3b3);
+        padding: 2.5rem 1rem;
+    }
+
+    .support-chat-status {
+        font-size: 0.72rem;
+        color: var(--lux-muted, #b3b3b3);
+        margin-top: 0.25rem;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .support-chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .support-chat-placeholder {
+        margin: auto;
+        text-align: center;
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .support-msg {
+        max-width: 78%;
+        padding: 0.65rem 0.9rem;
+        border: 1px dashed var(--lux-line, rgba(255,255,255,0.18));
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+
+    .support-msg--staff {
+        align-self: flex-end;
+        border-color: rgba(255,255,255,0.35);
+        background: rgba(255,255,255,0.05);
+    }
+
+    .support-msg--customer {
+        align-self: flex-start;
+    }
+
+    .support-msg__meta {
+        font-size: 0.68rem;
+        color: var(--lux-muted, #b3b3b3);
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .support-chat-input-area {
+        display: flex;
+        gap: 0.5rem;
+        padding: 1rem;
+        border-top: 1px dashed var(--lux-line, rgba(255,255,255,0.15));
+    }
+
+    .support-chat-input {
+        flex: 1;
+        background: transparent;
+        border: 1px dashed var(--lux-line, rgba(255,255,255,0.2));
+        color: var(--lux-white, #fff);
+        padding: 0.65rem 0.85rem;
+        border-radius: 0;
+    }
+
+    .support-chat-input:focus {
+        outline: none;
+        border-color: var(--lux-white, #fff);
+    }
+
+    .support-chat-input:disabled { opacity: 0.5; }
+
+    .support-chat-send {
+        width: 44px;
+        background: transparent;
+        border: 1px dashed var(--lux-line, rgba(255,255,255,0.25));
+        color: var(--lux-white, #fff);
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .support-chat-send:hover:not(:disabled) {
+        background: var(--lux-white, #fff);
+        color: #000;
+    }
+
+    .support-chat-send:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    @@media (max-width: 992px) {
+        .support-layout { grid-template-columns: 1fr; }
+        .support-sessions-panel { min-height: 240px; }
+    }
+</style>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@@8.0.7/dist/browser/signalr.min.js"></script>
+    <script>
+        (function () {
+            const staffName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(staffName));
+            let activeSessionId = null;
+            let connection = null;
+
+            const sessionList = document.getElementById('sessionList');
+            const sessionCount = document.getElementById('sessionCount');
+            const chatMessages = document.getElementById('adminChatMessages');
+            const chatCustomerLabel = document.getElementById('chatCustomerLabel');
+            const chatSessionStatus = document.getElementById('chatSessionStatus');
+            const chatInput = document.getElementById('adminChatInput');
+            const chatSend = document.getElementById('adminChatSend');
+            const btnCloseSession = document.getElementById('btnCloseSession');
+
+            function formatTime(iso) {
+                if (!iso) return '';
+                const d = new Date(iso);
+                return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+            }
+
+            function statusLabel(status) {
+                if (status === 'Pending') return 'Chờ xử lý';
+                if (status === 'Active') return 'Đang chat';
+                if (status === 'Closed') return 'Đã đóng';
+                return status;
+            }
+
+            function statusClass(status) {
+                if (status === 'Pending') return 'status-pending';
+                if (status === 'Active') return 'status-active';
+                return 'status-closed';
+            }
+
+            function removeSessionFromList(sessionId) {
+                const id = String(sessionId);
+                const item = sessionList.querySelector('[data-session-id="' + id + '"]');
+                if (item) item.remove();
+
+                const count = sessionList.querySelectorAll('.support-session-item').length;
+                sessionCount.textContent = String(count);
+
+                if (count === 0) {
+                    sessionList.innerHTML = '<div class="support-empty" id="sessionEmpty"><i class="fas fa-comments fa-2x mb-2"></i><p>Chưa có yêu cầu hỗ trợ nào</p></div>';
+                }
+            }
+
+            function handleSessionClosed(sessionId, initiator) {
+                const id = Number(sessionId);
+                const wasActive = id === activeSessionId;
+                removeSessionFromList(id);
+
+                if (wasActive) {
+                    if (initiator === 'Customer') {
+                        appendMessage('System', 'Khách hàng đã ngắt kết nối.', new Date().toISOString());
+                        setTimeout(function () { resetChatPanel(); }, 1500);
+                    } else {
+                        resetChatPanel();
+                    }
+                }
+            }
+
+            function resetChatPanel() {
+                activeSessionId = null;
+                chatCustomerLabel.innerHTML = '<i class="fas fa-user me-2"></i>Chọn một yêu cầu để bắt đầu';
+                chatSessionStatus.textContent = '';
+                chatInput.disabled = true;
+                chatSend.disabled = true;
+                if (btnCloseSession) {
+                    btnCloseSession.hidden = true;
+                    btnCloseSession.disabled = false;
+                }
+                chatMessages.innerHTML =
+                    '<div class="support-chat-placeholder"><i class="fas fa-comment-dots fa-3x mb-3"></i><p>Chọn khách hàng bên trái để xem và trả lời tin nhắn</p></div>';
+            }
+
+            function clearPlaceholder() {
+                const ph = chatMessages.querySelector('.support-chat-placeholder');
+                if (ph) ph.remove();
+            }
+
+            function appendMessage(sender, message, sentAt, scroll) {
+                clearPlaceholder();
+                const isStaff = sender === 'Staff' || sender === staffName;
+                const wrap = document.createElement('div');
+                wrap.className = 'support-msg ' + (isStaff ? 'support-msg--staff' : 'support-msg--customer');
+                wrap.innerHTML =
+                    '<div class="support-msg__meta">' + (isStaff ? 'Bạn' : sender) + ' · ' + formatTime(sentAt) + '</div>' +
+                    '<div class="support-msg__text"></div>';
+                wrap.querySelector('.support-msg__text').textContent = message;
+                chatMessages.appendChild(wrap);
+                if (scroll !== false) chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            function renderSessionItem(session) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'support-session-item' + (session.sessionId === activeSessionId ? ' is-active' : '');
+                btn.dataset.sessionId = session.sessionId;
+                btn.dataset.customerName = session.customerName;
+                btn.innerHTML =
+                    '<div class="support-session-item__name"></div>' +
+                    '<div class="support-session-item__meta">' +
+                    '<span class="support-session-status"></span>' +
+                    '<span class="support-session-time"></span></div>';
+                btn.querySelector('.support-session-item__name').textContent = session.customerName;
+                const st = btn.querySelector('.support-session-status');
+                st.textContent = statusLabel(session.status);
+                st.className = 'support-session-status ' + statusClass(session.status);
+                btn.querySelector('.support-session-time').textContent = formatTime(session.createdAt);
+                btn.addEventListener('click', function () { selectSession(session.sessionId, session.customerName, session.status); });
+                return btn;
+            }
+
+            function refreshSessionList(sessions) {
+                sessionList.innerHTML = '';
+                if (!sessions || sessions.length === 0) {
+                    sessionList.innerHTML = '<div class="support-empty" id="sessionEmpty"><i class="fas fa-comments fa-2x mb-2"></i><p>Chưa có yêu cầu hỗ trợ nào</p></div>';
+                    sessionCount.textContent = '0';
+                    return;
+                }
+                sessions.forEach(function (s) { sessionList.appendChild(renderSessionItem(s)); });
+                sessionCount.textContent = String(sessions.length);
+            }
+
+            async function loadSessions() {
+                try {
+                    const res = await fetch('/Support/GetSessions');
+                    const data = await res.json();
+                    if (data.success) refreshSessionList(data.sessions);
+                } catch (e) { /* ignore */ }
+            }
+
+            async function selectSession(sessionId, customerName, status) {
+                activeSessionId = Number(sessionId);
+                document.querySelectorAll('.support-session-item').forEach(function (el) {
+                    el.classList.toggle('is-active', Number(el.dataset.sessionId) === activeSessionId);
+                });
+
+                chatCustomerLabel.innerHTML = '<i class="fas fa-user me-2"></i>' + (customerName || 'Khách hàng');
+                chatSessionStatus.textContent = statusLabel(status || 'Active');
+                chatInput.disabled = false;
+                chatSend.disabled = false;
+                if (btnCloseSession) btnCloseSession.hidden = false;
+                chatMessages.innerHTML = '';
+                chatInput.focus();
+
+                try {
+                    if (connection) await connection.invoke('JoinRoom', sessionId);
+                    const res = await fetch('/Support/GetMessages?sessionId=' + encodeURIComponent(sessionId));
+                    const data = await res.json();
+                    if (data.success && data.session && data.session.status === 'Closed') {
+                        handleSessionClosed(sessionId, 'Customer');
+                        return;
+                    }
+                    if (data.success && data.messages) {
+                        data.messages.forEach(function (m) {
+                            appendMessage(m.sender, m.message, m.sentAt, false);
+                        });
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                } catch (e) {
+                    appendMessage('System', 'Không thể tải lịch sử tin nhắn.', new Date().toISOString());
+                }
+            }
+
+            function upsertSession(sessionId, customerName, status, createdAt) {
+                if (status === 'Closed') {
+                    handleSessionClosed(sessionId, 'Customer');
+                    return;
+                }
+
+                let existing = sessionList.querySelector('[data-session-id="' + sessionId + '"]');
+                if (existing) {
+                    existing.querySelector('.support-session-status').textContent = statusLabel(status);
+                    existing.querySelector('.support-session-status').className = 'support-session-status ' + statusClass(status);
+                    return;
+                }
+                const empty = document.getElementById('sessionEmpty');
+                if (empty) empty.remove();
+                const item = renderSessionItem({ sessionId, customerName, status, createdAt });
+                sessionList.prepend(item);
+                const count = sessionList.querySelectorAll('.support-session-item').length;
+                sessionCount.textContent = String(count);
+            }
+
+            async function sendAdminMessage() {
+                const text = chatInput.value.trim();
+                if (!text || !activeSessionId || !connection) return;
+                chatInput.value = '';
+                try {
+                    await connection.invoke('SendMessage', activeSessionId, 'Staff', text);
+                } catch (e) {
+                    appendMessage('System', 'Gửi tin nhắn thất bại.', new Date().toISOString());
+                }
+            }
+
+            async function closeActiveSession() {
+                if (!activeSessionId || !connection) return;
+                if (btnCloseSession) btnCloseSession.disabled = true;
+                const closingId = activeSessionId;
+
+                try {
+                    await connection.invoke('DisconnectSupport', closingId, 'Staff');
+                    handleSessionClosed(closingId, 'Staff');
+                } catch (e) {
+                    appendMessage('System', 'Không thể kết thúc phiên. Vui lòng thử lại.', new Date().toISOString());
+                    if (btnCloseSession) btnCloseSession.disabled = false;
+                }
+            }
+
+            if (btnCloseSession) {
+                btnCloseSession.addEventListener('click', closeActiveSession);
+            }
+
+            document.querySelectorAll('.support-session-item').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    selectSession(Number(btn.dataset.sessionId), btn.dataset.customerName, btn.querySelector('.support-session-status').textContent);
+                });
+            });
+
+            chatSend.addEventListener('click', sendAdminMessage);
+            chatInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); sendAdminMessage(); }
+            });
+
+            connection = new signalR.HubConnectionBuilder()
+                .withUrl('/supporthub')
+                .withAutomaticReconnect()
+                .build();
+
+            connection.on('ReceiveMessage', function (sessionId, sender, message, sentAt) {
+                if (Number(sessionId) !== activeSessionId) return;
+                appendMessage(sender, message, sentAt);
+            });
+
+            connection.on('NewSupportRequest', function (sessionId, customerName, status, createdAt) {
+                upsertSession(sessionId, customerName, status, createdAt);
+            });
+
+            connection.on('SessionUpdated', function (sessionId, status, initiator) {
+                if (status === 'Closed') {
+                    handleSessionClosed(sessionId, initiator || 'Customer');
+                    return;
+                }
+
+                const item = sessionList.querySelector('[data-session-id="' + sessionId + '"]');
+                if (item) {
+                    const st = item.querySelector('.support-session-status');
+                    st.textContent = statusLabel(status);
+                    st.className = 'support-session-status ' + statusClass(status);
+                }
+                if (Number(sessionId) === activeSessionId) {
+                    chatSessionStatus.textContent = statusLabel(status);
+                }
+            });
+
+            connection.start()
+                .then(function () { return connection.invoke('JoinSupportAgents'); })
+                .catch(function () { console.warn('SignalR admin connection failed'); });
+
+            loadSessions();
+        })();
+    </script>
+}

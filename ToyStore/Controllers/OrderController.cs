@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using ToyStore.Attributes;
 using ToyStore.Domain.Entities;
 using ToyStore.Domain.Events;
 using ToyStore.Domain.Interfaces;
 using ToyStore.Helpers;
+using ToyStore.Hubs;
 using ToyStore.Models;
 using ToyStore.Services;
 
@@ -18,6 +19,9 @@ namespace ToyStore.Controllers
         private readonly IOrderEventDispatcher _orderEventDispatcher;
         private readonly IGuestCheckoutService _guestCheckoutService;
         private readonly ICartStorageService _cartStorage;
+        private readonly IHubContext<SupportHub> _hubContext;
+        private readonly GhnOrderShippingService _ghnOrderShippingService;
+        private readonly ILogger<OrderController> _logger;
 
         public OrderController(
             ICheckoutFacade checkoutFacade,
@@ -25,7 +29,10 @@ namespace ToyStore.Controllers
             ISessionService sessionService,
             IOrderEventDispatcher orderEventDispatcher,
             IGuestCheckoutService guestCheckoutService,
-            ICartStorageService cartStorage)
+            ICartStorageService cartStorage,
+            IHubContext<SupportHub> hubContext,
+            GhnOrderShippingService ghnOrderShippingService,
+            ILogger<OrderController> logger)
         {
             _checkoutFacade = checkoutFacade;
             _unitOfWork = unitOfWork;
@@ -33,6 +40,9 @@ namespace ToyStore.Controllers
             _orderEventDispatcher = orderEventDispatcher;
             _guestCheckoutService = guestCheckoutService;
             _cartStorage = cartStorage;
+            _hubContext = hubContext;
+            _ghnOrderShippingService = ghnOrderShippingService;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -42,7 +52,13 @@ namespace ToyStore.Controllers
             string? guestFullName,
             string? guestEmail,
             string? guestPhone,
-            string? guestAddress)
+            string? guestAddress,
+            string? deliveryStreet,
+            int? ghnProvinceId,
+            int? ghnDistrictId,
+            string? ghnWardCode,
+            string? shippingAddress,
+            decimal shippingFee = 0)
         {
             try
             {
@@ -53,23 +69,112 @@ namespace ToyStore.Controllers
                     return RedirectToAction("Index", "Cart");
                 }
 
+                cart.EnsureCartItemIds();
+                var selectedIds = CartSelectionHelper.GetSelectedIds(HttpContext);
+                if (!selectedIds.Any())
+                {
+                    TempData["ErrorMessage"] = "Vui lòng chọn ít nhất 1 sản phẩm.";
+                    return RedirectToAction("Index", "Cart");
+                }
+
+                var fullCart = cart;
+                cart = fullCart.CreateSubset(selectedIds);
+                if (!cart.Items.Any())
+                {
+                    TempData["ErrorMessage"] = "Không tìm thấy sản phẩm đã chọn trong giỏ hàng.";
+                    return RedirectToAction("Index", "Cart");
+                }
+
+                PromoSessionHelper.ApplySessionPromoToCart(HttpContext, cart);
+                PromoSessionHelper.CapDiscountToSubtotal(cart, HttpContext);
+
+                if (!_sessionService.IsCustomer(HttpContext) && !string.IsNullOrWhiteSpace(deliveryStreet))
+                {
+                    guestAddress = deliveryStreet;
+                }
+
                 var customerId = await ResolveCustomerIdForCheckoutAsync(
                     guestFullName, guestEmail, guestPhone, guestAddress);
 
+                var normalizedShippingFee = shippingFee < 0 ? 0 : shippingFee;
+
                 if (string.Equals(paymentMethod, "VNPAY", StringComparison.OrdinalIgnoreCase))
                 {
+                    PendingGhnCheckoutSession.SaveDraft(HttpContext, new PendingGhnCheckoutData
+                    {
+                        GhnProvinceId = ghnProvinceId,
+                        GhnDistrictId = ghnDistrictId,
+                        GhnWardCode = ghnWardCode,
+                        ShippingAddress = shippingAddress,
+                        DeliveryStreet = deliveryStreet,
+                        ShippingFee = normalizedShippingFee
+                    });
+
                     return RedirectToAction("CreatePaymentUrlGet", "Payment");
                 }
 
-                var createdOrder = await _checkoutFacade.PlaceOrderAsync(cart, customerId, paymentMethod);
+                var normalizedShippingFeeCod = normalizedShippingFee;
+                var deliveryMethod = normalizedShippingFeeCod > 0 || ghnDistrictId is > 0 ? "GHN" : "Standard";
+
+                var createdOrder = await _checkoutFacade.PlaceOrderAsync(
+                    cart,
+                    customerId,
+                    paymentMethod,
+                    normalizedShippingFeeCod,
+                    deliveryMethod);
 
                 // Áp dụng ưu đãi hạng thẻ thành viên (xếp chồng): gán MembershipDiscountValue
                 // và trừ thêm vào tổng tiền của đơn trước khi hoàn tất.
                 await ApplyMembershipDiscountAsync(createdOrder, cart);
 
-                await _cartStorage.ClearCartAfterOrderAsync(HttpContext, customerId);
+                await SaveOrderShippingAddressAsync(
+                    createdOrder,
+                    shippingAddress,
+                    deliveryStreet,
+                    ghnProvinceId,
+                    ghnDistrictId,
+                    ghnWardCode);
+
+                try
+                {
+                    await TryCreateGhnShippingAsync(
+                        createdOrder,
+                        customerId,
+                        guestFullName,
+                        guestPhone,
+                        guestAddress,
+                        deliveryStreet,
+                        ghnDistrictId,
+                        ghnWardCode,
+                        new PendingGhnCheckoutData
+                        {
+                            GhnProvinceId = ghnProvinceId,
+                            GhnDistrictId = ghnDistrictId,
+                            GhnWardCode = ghnWardCode,
+                            ShippingAddress = shippingAddress,
+                            DeliveryStreet = deliveryStreet
+                        });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "GHN đồng bộ thất bại cho đơn #{OrderId}", createdOrder.OrderId);
+                    TempData["GhnError"] =
+                        "Đơn hàng đã được ghi nhận trên hệ thống nhưng chưa thể đồng bộ sang Giao Hàng Nhanh vì: "
+                        + ex.Message;
+                }
+
+                await PromoSessionHelper.RecordPromoUsageAsync(_unitOfWork, cart);
+
+                await _cartStorage.RemoveItemsAsync(HttpContext, selectedIds, customerId);
+                PromoSessionHelper.ClearSessionPromo(HttpContext);
 
                 await _orderEventDispatcher.PublishAsync(new OrderConfirmedEvent(createdOrder));
+
+                await _hubContext.Clients.Group("Admins").SendAsync(
+                    "ReceiveAdminNotification",
+                    "Đơn hàng mới",
+                    $"Đơn hàng #{createdOrder.OrderId} vừa được đặt thành công!",
+                    "/Orders");
 
                 if (!_sessionService.IsCustomer(HttpContext))
                 {
@@ -165,70 +270,25 @@ namespace ToyStore.Controllers
                     return RedirectToAction("ProductDetails", "Home", new { id = productId });
                 }
 
-                var customerId = _sessionService.GetUserId(HttpContext);
-                if (customerId == 0)
+                var cart = await _cartStorage.GetCartAsync(HttpContext);
+                cart.Clear();
+                cart.AddItem(product, quantity);
+                cart.EnsureCartItemIds();
+                await _cartStorage.SaveCartAsync(HttpContext, cart);
+
+                PromoSessionHelper.ClearSessionPromo(HttpContext);
+
+                var cartItem = cart.Items.FirstOrDefault(i => i.ProductId == productId);
+                if (cartItem == null)
                 {
-                    var cart = await _cartStorage.GetCartAsync(HttpContext);
-                    cart.Clear();
-                    cart.AddItem(product, quantity);
-                    await _cartStorage.SaveCartAsync(HttpContext, cart);
-                    TempData["SuccessMessage"] = "Đã thêm sản phẩm vào giỏ. Vui lòng nhập thông tin giao hàng để hoàn tất đơn.";
-                    return RedirectToAction("Checkout", "Cart");
+                    TempData["ErrorMessage"] = "Không thể thêm sản phẩm vào giỏ hàng.";
+                    return RedirectToAction("ProductDetails", "Home", new { id = productId });
                 }
 
-                await _unitOfWork.BeginTransactionAsync();
+                CartSelectionHelper.SaveSelectedIds(HttpContext, new[] { cartItem.CartItemId });
 
-                try
-                {
-                    decimal subtotal = product.Price * quantity;
-                    decimal discountValue = 0;
-                    decimal finalTotal = subtotal;
-
-                    var newOrder = new Order
-                    {
-                        CustomerId = customerId,
-                        OrderDate = DateTime.Now,
-                        Status = "Pending",
-                        Subtotal = subtotal,
-                        DiscountValue = discountValue,
-                        TotalAmount = finalTotal,
-                        DiscountStrategyName = "NoDiscount",
-                        PaymentMethod = "COD"
-                    };
-
-                    await _unitOfWork.Orders.AddAsync(newOrder);
-                    await _unitOfWork.SaveChangesAsync();
-
-                    var orderDetail = new OrderDetail
-                    {
-                        OrderId = newOrder.OrderId,
-                        ProductId = product.ProductId,
-                        Quantity = quantity,
-                        UnitPrice = product.Price
-                    };
-
-                    await _unitOfWork.OrderDetails.AddAsync(orderDetail);
-
-                    product.Stock -= quantity;
-                    if (product.Stock < 0)
-                    {
-                        product.Stock = 0;
-                    }
-
-                    _unitOfWork.Products.Update(product);
-
-                    await _unitOfWork.SaveChangesAsync();
-                    await _orderEventDispatcher.PublishAsync(new OrderConfirmedEvent(newOrder));
-                    await _unitOfWork.CommitTransactionAsync();
-
-                    TempData["SuccessMessage"] = $"Mua ngay thành công! Mã đơn hàng: #{newOrder.OrderId}";
-                    return RedirectToAction("Details", new { id = newOrder.OrderId });
-                }
-                catch
-                {
-                    await _unitOfWork.RollbackTransactionAsync();
-                    throw;
-                }
+                TempData["SuccessMessage"] = "Chuẩn bị thanh toán. Vui lòng chọn phương thức thanh toán.";
+                return RedirectToAction("Checkout", "Cart", new { selectedItems = new[] { cartItem.CartItemId } });
             }
             catch (Exception ex)
             {
@@ -306,10 +366,6 @@ namespace ToyStore.Controllers
             }
         }
 
-        /// <summary>
-        /// Tính & gán giá trị giảm theo hạng thẻ thành viên cho đơn hàng vừa tạo,
-        /// đồng thời trừ vào TotalAmount. Bảo đảm an toàn null và không cho tổng tiền âm.
-        /// </summary>
         private async Task ApplyMembershipDiscountAsync(Order order, ShoppingCart cart)
         {
             if (order == null)
@@ -410,6 +466,57 @@ namespace ToyStore.Controllers
 
             error = string.Empty;
             return true;
+        }
+
+        private async Task SaveOrderShippingAddressAsync(
+            Order order,
+            string? shippingAddress,
+            string? deliveryStreet,
+            int? ghnProvinceId,
+            int? ghnDistrictId,
+            string? ghnWardCode)
+        {
+            await _ghnOrderShippingService.SaveShippingAddressAsync(order, new PendingGhnCheckoutData
+            {
+                GhnProvinceId = ghnProvinceId,
+                GhnDistrictId = ghnDistrictId,
+                GhnWardCode = ghnWardCode,
+                ShippingAddress = shippingAddress,
+                DeliveryStreet = deliveryStreet
+            });
+        }
+
+        private async Task TryCreateGhnShippingAsync(
+            Order order,
+            int customerId,
+            string? guestFullName,
+            string? guestPhone,
+            string? guestAddress,
+            string? deliveryStreet,
+            int? ghnDistrictId,
+            string? ghnWardCode,
+            PendingGhnCheckoutData? ghnData = null)
+        {
+            if (order == null || ghnDistrictId is not > 0 || string.IsNullOrWhiteSpace(ghnWardCode))
+            {
+                return;
+            }
+
+            ghnData ??= new PendingGhnCheckoutData
+            {
+                GhnDistrictId = ghnDistrictId,
+                GhnWardCode = ghnWardCode,
+                DeliveryStreet = deliveryStreet
+            };
+
+            var customer = await _unitOfWork.Customers.GetByIdAsync(customerId);
+            await _ghnOrderShippingService.CreateShippingOrderAsync(
+                order,
+                customer,
+                ghnData,
+                guestFullName,
+                guestPhone,
+                guestAddress);
         }
 
     }

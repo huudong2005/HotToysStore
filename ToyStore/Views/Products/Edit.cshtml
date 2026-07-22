@@ -69,12 +69,12 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Ảnh sản phẩm</label>
+                            <label class="form-label">Ảnh chính</label>
                             @if (!string.IsNullOrWhiteSpace(Model.ImageUrl))
                             {
                                 <div class="mb-2">
                                     <img src="@Model.ImageUrl" alt="Ảnh hiện tại" class="product-current-image" />
-                                    <small class="form-text text-muted d-block mt-1">Ảnh hiện tại — chọn file mới bên dưới để thay thế</small>
+                                    <small class="form-text text-muted d-block mt-1">Ảnh chính hiện tại — chọn file mới bên dưới để thay thế</small>
                                 </div>
                             }
                             <input type="file" name="imageFile" class="form-control" accept="image/*" />
@@ -82,6 +82,29 @@
                             @if (ViewData.ModelState["imageFile"]?.Errors.Count > 0)
                             {
                                 <span class="text-danger small">@ViewData.ModelState["imageFile"]!.Errors[0].ErrorMessage</span>
+                            }
+                        </div>
+
+                        @if (Model.ProductImages != null && Model.ProductImages.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Ảnh thư viện hiện có</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var galleryImage in Model.ProductImages.OrderBy(pi => pi.DisplayOrder))
+                                    {
+                                        <img src="@galleryImage.ImageUrl" alt="Ảnh thư viện" class="product-gallery-thumb-preview" />
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label mt-3">Ảnh thư viện (Có thể chọn nhiều ảnh cùng lúc)</label>
+                            <input type="file" name="galleryFiles" class="form-control" accept="image/*" multiple />
+                            <small class="form-text text-muted">Thêm ảnh mới vào thư viện — ảnh cũ vẫn được giữ nguyên</small>
+                            @if (ViewData.ModelState["galleryFiles"]?.Errors.Count > 0)
+                            {
+                                <span class="text-danger small">@ViewData.ModelState["galleryFiles"]!.Errors[0].ErrorMessage</span>
                             }
                         </div>
 
@@ -203,6 +226,14 @@
         object-fit: cover;
         border: 1px dashed var(--lux-line, rgba(255,255,255,0.35));
         display: block;
+    }
+
+    .product-gallery-thumb-preview {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25));
+        border-radius: 4px;
     }
 </style>
 

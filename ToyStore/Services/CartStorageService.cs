@@ -1,4 +1,5 @@
 using ToyStore.Domain.Interfaces;
+using ToyStore.Helpers;
 using ToyStore.Models;
 
 namespace ToyStore.Services;
@@ -80,11 +81,31 @@ public class CartStorageService : ICartStorageService
     public async Task ClearCartAfterOrderAsync(HttpContext context, int customerId)
     {
         SetSessionCart(context, new ShoppingCart());
+        CartSelectionHelper.ClearSelectedIds(context);
 
         if (customerId > 0)
         {
             await _cartPersistence.ClearAsync(customerId);
         }
+    }
+
+    public async Task RemoveItemsAsync(HttpContext context, IEnumerable<int> cartItemIds, int customerId)
+    {
+        var cart = await GetCartAsync(context);
+        cart.EnsureCartItemIds();
+
+        var idSet = cartItemIds.ToHashSet();
+        cart.Items.RemoveAll(i => idSet.Contains(i.CartItemId));
+
+        CartSelectionHelper.ClearSelectedIds(context);
+
+        if (!cart.Items.Any())
+        {
+            await ClearCartAfterOrderAsync(context, customerId);
+            return;
+        }
+
+        await SaveCartAsync(context, cart);
     }
 
     private static ShoppingCart GetSessionCart(HttpContext context)
@@ -112,6 +133,7 @@ public class CartStorageService : ICartStorageService
         {
             merged.Items.Add(new ShoppingCartItem
             {
+                CartItemId = item.CartItemId != 0 ? item.CartItemId : item.ProductId,
                 ProductId = item.ProductId,
                 ProductName = item.ProductName,
                 Price = item.Price,
@@ -131,6 +153,7 @@ public class CartStorageService : ICartStorageService
             {
                 merged.Items.Add(new ShoppingCartItem
                 {
+                    CartItemId = item.CartItemId != 0 ? item.CartItemId : item.ProductId,
                     ProductId = item.ProductId,
                     ProductName = item.ProductName,
                     Price = item.Price,

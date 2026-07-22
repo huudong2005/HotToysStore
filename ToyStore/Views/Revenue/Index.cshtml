@@ -9,6 +9,10 @@
     var rangeStart = ViewBag.RangeStart as DateTime? ?? DateTime.Now;
     var rangeEnd = ViewBag.RangeEnd as DateTime? ?? DateTime.Now;
     var stats = Model?.ToList() ?? new List<ToyStore.Models.PromotionStatisticViewModel>();
+    var voucherStats = ViewBag.VoucherStats as IEnumerable<ToyStore.Models.VoucherStatisticViewModel>;
+    var tierStats = ViewBag.TierStats as IEnumerable<ToyStore.Models.TierStatisticViewModel>;
+    var voucherList = voucherStats?.ToList() ?? new List<ToyStore.Models.VoucherStatisticViewModel>();
+    var tierList = tierStats?.ToList() ?? new List<ToyStore.Models.TierStatisticViewModel>();
 
     var periodTotalVoucher = stats.Sum(x => x.TotalVoucherDiscount);
     var periodTotalMembership = stats.Sum(x => x.TotalMembershipDiscount);
@@ -162,6 +166,92 @@
                         </tfoot>
                     }
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4 g-4">
+        <div class="col-md-6">
+            <div class="card revenue-table-card h-100">
+                <div class="card-header revenue-table-header py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-ticket-alt me-2"></i> Hiệu quả Mã Khuyến Mãi
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover revenue-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Mã Khuyến Mãi</th>
+                                    <th class="text-end">Số Lượt Dùng</th>
+                                    <th class="text-end">Tổng Tiền Đã Giảm</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (ViewBag.VoucherStats != null && voucherList.Any())
+                                {
+                                    foreach (var item in voucherList)
+                                    {
+                                        <tr>
+                                            <td><code>@item.PromotionCode</code></td>
+                                            <td class="text-end">@item.UsageCount</td>
+                                            <td class="text-end">@FormatVnd(item.TotalDiscount)</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-4">Không có dữ liệu trong khoảng thời gian này</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card revenue-table-card h-100">
+                <div class="card-header revenue-table-header py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-crown me-2"></i> Thống kê Hạng Thành Viên
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover revenue-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Hạng Thẻ</th>
+                                    <th class="text-end">Số Đơn Hàng</th>
+                                    <th class="text-end">Tổng Tiền Đã Giảm</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (ViewBag.TierStats != null && tierList.Any())
+                                {
+                                    foreach (var item in tierList)
+                                    {
+                                        <tr>
+                                            <td>@item.TierName</td>
+                                            <td class="text-end">@item.OrderCount</td>
+                                            <td class="text-end">@FormatVnd(item.TotalMembershipDiscount)</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-4">Không có dữ liệu trong khoảng thời gian này</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

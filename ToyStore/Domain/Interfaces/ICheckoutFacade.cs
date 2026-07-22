@@ -21,5 +21,10 @@ public interface ICheckoutFacade
     /// <param name="paymentMethod">Phương thức thanh toán</param>
     /// <returns>Order đã được tạo thành công</returns>
     /// <exception cref="InvalidOperationException">Nếu giỏ hàng trống hoặc không đủ tồn kho</exception>
-    Task<Order> PlaceOrderAsync(ShoppingCart cart, int customerId, string? paymentMethod = null);
+    Task<Order> PlaceOrderAsync(
+        ShoppingCart cart,
+        int customerId,
+        string? paymentMethod = null,
+        decimal shippingFee = 0,
+        string? deliveryMethod = null);
 }

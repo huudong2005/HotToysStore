@@ -1,0 +1,73 @@
+@model IEnumerable<ToyStore.Domain.Entities.GoodsReceipt>
+@{
+    ViewData["Title"] = "Quản lý Nhập Kho";
+    string FormatVnd(decimal amount) =>
+        amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + " ₫";
+}
+
+@await Html.PartialAsync("_HrDarkThemeStyles")
+
+<div class="container-fluid hr-page py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <h2 class="hr-page-title mb-0">
+            <i class="fas fa-warehouse me-2"></i> Phiếu Nhập Kho
+        </h2>
+        <a asp-action="Create" class="btn hr-btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i> Tạo phiếu nhập
+        </a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert hr-alert hr-alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card hr-table-card">
+        <div class="card-header hr-table-header py-3">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i> Danh sách phiếu nhập</h5>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table hr-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mã phiếu</th>
+                                <th>Ngày nhập</th>
+                                <th>Người tạo</th>
+                                <th class="text-end">Tổng chi phí</th>
+                                <th class="text-center">Số dòng SP</th>
+                                <th>Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var receipt in Model)
+                            {
+                                <tr>
+                                    <td><span class="badge hr-badge">#@receipt.ReceiptId</span></td>
+                                    <td>@receipt.ImportDate.ToString("dd/MM/yyyy")</td>
+                                    <td>@(receipt.Admin?.FullName ?? receipt.Admin?.Username ?? "—")</td>
+                                    <td class="text-end">@FormatVnd(receipt.TotalCost)</td>
+                                    <td class="text-center">@receipt.GoodsReceiptDetails.Count</td>
+                                    <td class="text-muted">@(string.IsNullOrWhiteSpace(receipt.Note) ? "—" : receipt.Note)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-3">Chưa có phiếu nhập kho nào.</p>
+                    <a asp-action="Create" class="btn hr-btn-primary btn-sm">Tạo phiếu nhập đầu tiên</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>

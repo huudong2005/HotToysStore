@@ -47,6 +47,8 @@ public class RevenueController : Controller
         }
 
         var statistics = await _unitOfWork.Orders.GetPromotionStatisticsAsync(rangeStart, rangeEnd);
+        var voucherStats = await _unitOfWork.Orders.GetVoucherStatisticsAsync(rangeStart, rangeEnd);
+        var tierStats = await _unitOfWork.Orders.GetTierStatisticsAsync(rangeStart, rangeEnd);
 
         ViewBag.FilterMode = filterMode;
         ViewBag.SelectedYear = selectedYear;
@@ -54,6 +56,8 @@ public class RevenueController : Controller
         ViewBag.EndDate = endDate;
         ViewBag.RangeStart = rangeStart;
         ViewBag.RangeEnd = rangeEnd;
+        ViewBag.VoucherStats = voucherStats;
+        ViewBag.TierStats = tierStats;
 
         return View(statistics);
     }

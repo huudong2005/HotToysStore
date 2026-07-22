@@ -1,0 +1,159 @@
+@model IEnumerable<ToyStore.Domain.Entities.Payroll>
+@{
+    ViewData["Title"] = "Bảng lương nhân viên";
+    var month = (int)ViewBag.Month;
+    var year = (int)ViewBag.Year;
+    var totalNet = ViewBag.TotalNetSalary as decimal? ?? 0m;
+    var totalShifts = ViewBag.TotalShifts as int? ?? 0;
+
+    string FormatVnd(decimal amount) =>
+        amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + " ₫";
+}
+
+@await Html.PartialAsync("_HrDarkThemeStyles")
+
+<div class="container-fluid hr-page py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <h2 class="hr-page-title mb-0">
+            <i class="fas fa-money-check-alt me-2"></i> Bảng lương nhân viên
+        </h2>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert hr-alert hr-alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert hr-alert hr-alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card hr-ghost-card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <form method="get" asp-action="Index" class="hr-filter-form row g-3 align-items-end">
+                        <div class="col-md-4">
+                            <label class="hr-label">Tháng</label>
+                            <select name="month" class="form-select">
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    <option value="@m" selected="@(month == m)">Tháng @m</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="hr-label">Năm</label>
+                            <select name="year" class="form-select">
+                                @foreach (var y in Enumerable.Range(DateTime.Now.Year - 1, 4))
+                                {
+                                    <option value="@y" selected="@(year == y)">@y</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn hr-btn-outline btn-sm w-100">
+                                <i class="fas fa-filter me-1"></i> Xem
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <form asp-action="Calculate" method="post" class="d-inline"
+                          onsubmit="return confirm('Chốt lương tháng @month/@year? Hệ thống sẽ tính lại theo ca đã hoàn thành.');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="month" value="@month" />
+                        <input type="hidden" name="year" value="@year" />
+                        <button type="submit" class="btn hr-btn-primary btn-sm">
+                            <i class="fas fa-calculator me-1"></i> Tính lương
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card hr-ghost-card h-100">
+                <div class="card-body">
+                    <p class="hr-label mb-1">Tổng ca hoàn thành (đã chốt)</p>
+                    <p class="hr-stat-value">@totalShifts ca</p>
+                    <p class="hr-stat-hint">Kỳ lương tháng @month/@year</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card hr-ghost-card h-100">
+                <div class="card-body">
+                    <p class="hr-label mb-1">Tổng lương thực nhận</p>
+                    <p class="hr-stat-value">@FormatVnd(totalNet)</p>
+                    <p class="hr-stat-hint">200.000 ₫ × số ca hoàn thành / nhân viên</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card hr-table-card">
+        <div class="card-header hr-table-header py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-table me-2"></i> Chi tiết lương — Tháng @month/@year
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table hr-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Nhân viên</th>
+                                <th>Username</th>
+                                <th class="text-end">Đơn giá / ca</th>
+                                <th class="text-end">Ca hoàn thành</th>
+                                <th class="text-end">Lương thực nhận</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td><strong>@(item.Admin?.FullName ?? "—")</strong></td>
+                                    <td class="text-muted">@(item.Admin?.Username)</td>
+                                    <td class="text-end">@FormatVnd(item.BasicSalaryPerShift)</td>
+                                    <td class="text-end">@item.TotalShifts</td>
+                                    <td class="text-end">@FormatVnd(item.NetSalary)</td>
+                                    <td><span class="badge hr-badge">@item.Status</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2">Tổng cộng</td>
+                                <td class="text-end"></td>
+                                <td class="text-end">@totalShifts</td>
+                                <td class="text-end">@FormatVnd(totalNet)</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-3">Chưa có bản ghi lương cho tháng @month/@year.</p>
+                    <p class="text-muted small">Bấm <strong>Tính lương</strong> để chốt lương theo ca đã hoàn thành.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>

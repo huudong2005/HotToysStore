@@ -2,11 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Oracle.ManagedDataAccess.Client;
 using System.Data;
+using System.Text.Json;
 using ToyStore.Attributes;
 using ToyStore.Domain.Entities;
 using ToyStore.Domain.Interfaces;
 using ToyStore.Infrastructure.Data;
 using ToyStore.Models;
+using ToyStore.Services;
 
 namespace ToyStore.Controllers
 {
@@ -16,6 +18,7 @@ namespace ToyStore.Controllers
         private readonly ToyStoreContext _context;
         private readonly IProductRepository _productRepository;
         private readonly IWebHostEnvironment _env;
+        private readonly ISessionService _sessionService;
 
         private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
         private const long MaxFileSize = 10 * 1024 * 1024; // 10MB
@@ -23,11 +26,13 @@ namespace ToyStore.Controllers
         public ProductsController(
             ToyStoreContext context,
             IProductRepository productRepository,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            ISessionService sessionService)
         {
             _context = context;
             _productRepository = productRepository;
             _env = env;
+            _sessionService = sessionService;
         }
 
         // GET: Products
@@ -64,6 +69,34 @@ namespace ToyStore.Controllers
                 .FirstOrDefaultAsync(m => m.ProductId == id);
             
             if (product == null) return NotFound();
+
+            var priceHistories = await _context.ProductPriceHistories
+                .AsNoTracking()
+                .Include(h => h.Admin)
+                .Where(h => h.ProductId == id)
+                .OrderBy(h => h.ChangedAt)
+                .ToListAsync();
+
+            ViewBag.PriceHistories = priceHistories;
+
+            var chartLabels = new List<string>();
+            var chartPrices = new List<decimal>();
+
+            if (priceHistories.Count > 0)
+            {
+                chartLabels.Add(priceHistories[0].ChangedAt.ToString("dd/MM/yyyy HH:mm") + " (trước)");
+                chartPrices.Add(priceHistories[0].OldPrice);
+
+                foreach (var history in priceHistories)
+                {
+                    chartLabels.Add(history.ChangedAt.ToString("dd/MM/yyyy HH:mm"));
+                    chartPrices.Add(history.NewPrice);
+                }
+            }
+
+            ViewBag.PriceChartLabelsJson = JsonSerializer.Serialize(chartLabels);
+            ViewBag.PriceChartDataJson = JsonSerializer.Serialize(chartPrices);
+
             return View(product);
         }
 
@@ -77,13 +110,15 @@ namespace ToyStore.Controllers
         // POST: Products/Create - SỬ DỤNG PROCEDURE QUA REPOSITORY
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Product product, IFormFile? imageFile)
+        public async Task<IActionResult> Create(Product product, IFormFile? imageFile, List<IFormFile>? galleryFiles)
         {
             ModelState.Remove("Category");
             ModelState.Remove("CartItems");
             ModelState.Remove("OrderDetails");
+            ModelState.Remove("ProductImages");
             ModelState.Remove(nameof(Product.ImageUrl));
             ModelState.Remove("imageFile");
+            ModelState.Remove("galleryFiles");
 
             if (imageFile != null && imageFile.Length > 0)
             {
@@ -98,11 +133,28 @@ namespace ToyStore.Controllers
                 }
             }
 
+            var galleryError = ValidateGalleryFiles(galleryFiles);
+            if (galleryError != null)
+            {
+                ModelState.AddModelError("galleryFiles", galleryError);
+            }
+
             if (ModelState.IsValid)
             {
                 try
                 {
                     await _productRepository.AddProductViaProcedureAsync(product);
+
+                    var createdProduct = await _context.Products
+                        .Where(p => p.ProductName == product.ProductName && p.CategoryId == product.CategoryId)
+                        .OrderByDescending(p => p.ProductId)
+                        .FirstOrDefaultAsync();
+
+                    if (createdProduct != null && galleryFiles != null && galleryFiles.Count > 0)
+                    {
+                        await SaveGalleryImagesAsync(createdProduct.ProductId, galleryFiles);
+                    }
+
                     TempData["SuccessMessage"] = "Thêm sản phẩm thành công!";
                     return RedirectToAction(nameof(Index));
                 }
@@ -119,7 +171,9 @@ namespace ToyStore.Controllers
         // GET: Products/Edit/5
         public async Task<IActionResult> Edit(int id) // Giữ nguyên tham số 'id' như cũ của bạn
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products
+                .Include(p => p.ProductImages.OrderBy(pi => pi.DisplayOrder))
+                .FirstOrDefaultAsync(p => p.ProductId == id);
             if (product == null) return NotFound();
 
             var categories = await _context.Categories.ToListAsync();
@@ -130,11 +184,13 @@ namespace ToyStore.Controllers
         // POST: Products/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Product product, IFormFile? imageFile)
+        public async Task<IActionResult> Edit(int id, Product product, IFormFile? imageFile, List<IFormFile>? galleryFiles)
         {
             try
             {
-                var existingProduct = await _context.Products.FindAsync(id);
+                var existingProduct = await _context.Products
+                    .Include(p => p.ProductImages)
+                    .FirstOrDefaultAsync(p => p.ProductId == id);
                 if (existingProduct == null)
                 {
                     TempData["ErrorMessage"] = "Sản phẩm không tồn tại";
@@ -160,8 +216,10 @@ namespace ToyStore.Controllers
                 ModelState.Remove("Category");
                 ModelState.Remove("CartItems");
                 ModelState.Remove("OrderDetails");
+                ModelState.Remove("ProductImages");
                 ModelState.Remove(nameof(Product.ImageUrl));
                 ModelState.Remove("imageFile");
+                ModelState.Remove("galleryFiles");
 
                 product.ProductId = id;
                 product.ImageUrl = existingProduct.ImageUrl;
@@ -173,6 +231,7 @@ namespace ToyStore.Controllers
                     {
                         ModelState.AddModelError("imageFile", error);
                         ViewBag.Categories = await _context.Categories.ToListAsync();
+                        product.ProductImages = existingProduct.ProductImages;
                         return View(product);
                     }
 
@@ -180,9 +239,59 @@ namespace ToyStore.Controllers
                     product.ImageUrl = path;
                 }
 
+                var galleryError = ValidateGalleryFiles(galleryFiles);
+                if (galleryError != null)
+                {
+                    ModelState.AddModelError("galleryFiles", galleryError);
+                }
+
                 if (ModelState.IsValid)
                 {
-                    await _productRepository.UpdateProductViaProcedureAsync(product);
+                    var oldPriceSnapshot = await _context.Products
+                        .AsNoTracking()
+                        .Where(p => p.ProductId == id)
+                        .Select(p => p.Price)
+                        .FirstOrDefaultAsync();
+
+                    await using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        if (oldPriceSnapshot != product.Price)
+                        {
+                            var adminId = _sessionService.GetUserId(HttpContext);
+                            if (adminId <= 0)
+                            {
+                                throw new InvalidOperationException("Không xác định được tài khoản quản trị đang đăng nhập.");
+                            }
+
+                            _context.ProductPriceHistories.Add(new ProductPriceHistory
+                            {
+                                ProductId = id,
+                                OldPrice = oldPriceSnapshot,
+                                NewPrice = product.Price,
+                                ChangedAt = DateTime.Now,
+                                AdminId = adminId
+                            });
+
+                            await _context.SaveChangesAsync();
+                        }
+
+                        await _productRepository.UpdateProductViaProcedureAsync(product);
+                        await transaction.CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+
+                    if (galleryFiles != null && galleryFiles.Count > 0)
+                    {
+                        var startOrder = existingProduct.ProductImages.Count > 0
+                            ? existingProduct.ProductImages.Max(pi => pi.DisplayOrder)
+                            : 0;
+                        await SaveGalleryImagesAsync(id, galleryFiles, startOrder);
+                    }
 
                     TempData["SuccessMessage"] = "Cập nhật sản phẩm thành công qua Stored Procedure!";
                     return RedirectToAction("Index");
@@ -242,6 +351,61 @@ namespace ToyStore.Controllers
             }
 
             return RedirectToAction(nameof(Index));
+        }
+
+        private static string? ValidateGalleryFiles(List<IFormFile>? galleryFiles)
+        {
+            if (galleryFiles == null || galleryFiles.Count == 0)
+            {
+                return null;
+            }
+
+            foreach (var file in galleryFiles.Where(f => f.Length > 0))
+            {
+                var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (string.IsNullOrEmpty(ext) || !AllowedExtensions.Contains(ext))
+                {
+                    return "Ảnh thư viện chỉ chấp nhận jpg, jpeg, png, webp, gif.";
+                }
+
+                if (file.Length > MaxFileSize)
+                {
+                    return "Mỗi ảnh trong thư viện tối đa 10MB.";
+                }
+            }
+
+            return null;
+        }
+
+        private async Task SaveGalleryImagesAsync(int productId, List<IFormFile> galleryFiles, int startDisplayOrder = 0)
+        {
+            var displayOrder = startDisplayOrder;
+
+            foreach (var file in galleryFiles.Where(f => f != null && f.Length > 0))
+            {
+                try
+                {
+                    var (ok, path, _) = await SaveImageAsync(file);
+                    if (!ok)
+                    {
+                        continue;
+                    }
+
+                    displayOrder++;
+                    _context.ProductImages.Add(new ProductImage
+                    {
+                        ProductId = productId,
+                        ImageUrl = path,
+                        DisplayOrder = displayOrder
+                    });
+                }
+                catch
+                {
+                    // Bỏ qua ảnh lỗi, tiếp tục lưu các ảnh còn lại.
+                }
+            }
+
+            await _context.SaveChangesAsync();
         }
 
         private async Task<(bool Ok, string Path, string Error)> SaveImageAsync(IFormFile imageFile)

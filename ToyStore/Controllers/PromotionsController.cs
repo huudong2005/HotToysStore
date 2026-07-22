@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ToyStore.Attributes;
 using ToyStore.Domain.Entities;
 using ToyStore.Domain.Interfaces;
+using ToyStore.Helpers;
 
 namespace ToyStore.Controllers
 {
@@ -98,7 +99,25 @@ namespace ToyStore.Controllers
             {
                 try
                 {
-                    _unitOfWork.Promotions.Update(promotion);
+                    var existing = await _unitOfWork.Promotions.GetByIdAsync(id);
+                    if (existing == null)
+                    {
+                        return NotFound();
+                    }
+
+                    PromotionDateHelper.NormalizeOnReactivation(existing, promotion);
+
+                    existing.PromotionCode = promotion.PromotionCode;
+                    existing.PromotionName = promotion.PromotionName;
+                    existing.DiscountType = promotion.DiscountType;
+                    existing.DiscountValue = promotion.DiscountValue;
+                    existing.MinOrderValue = promotion.MinOrderValue;
+                    existing.StartDate = promotion.StartDate;
+                    existing.EndDate = promotion.EndDate;
+                    existing.UsageLimit = promotion.UsageLimit;
+                    existing.UsedCount = promotion.UsedCount;
+                    existing.IsActive = promotion.IsActive;
+
                     await _unitOfWork.SaveChangesAsync();
                     TempData["SuccessMessage"] = "Cập nhật mã khuyến mãi thành công!";
                     return RedirectToAction(nameof(Index));

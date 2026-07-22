@@ -1,0 +1,196 @@
+@model ToyStore.Models.CreateGoodsReceiptViewModel
+@{
+    ViewData["Title"] = "Tạo Phiếu Nhập Kho";
+    var products = ViewBag.Products as Microsoft.AspNetCore.Mvc.Rendering.SelectList;
+    var productOptions = products?.ToList() ?? new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+}
+
+@await Html.PartialAsync("_HrDarkThemeStyles")
+
+<div class="container-fluid hr-page py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="hr-page-title mb-0">
+            <i class="fas fa-file-import me-2"></i> Tạo Phiếu Nhập Kho
+        </h2>
+        <a asp-action="Index" class="btn hr-btn-outline btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Quay lại
+        </a>
+    </div>
+
+    <div class="card hr-ghost-card">
+        <div class="card-body p-4">
+            <form asp-action="Create" method="post" id="receiptForm" class="hr-filter-form">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <label asp-for="ImportDate" class="hr-label"></label>
+                        <input asp-for="ImportDate" type="date" class="form-control" />
+                        <span asp-validation-for="ImportDate" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-8">
+                        <label asp-for="Note" class="hr-label"></label>
+                        <input asp-for="Note" class="form-control" placeholder="Ghi chú phiếu nhập (tuỳ chọn)" />
+                        <span asp-validation-for="Note" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="hr-label mb-0"><i class="fas fa-boxes me-1"></i> Chi tiết sản phẩm</h5>
+                    <button type="button" class="btn hr-btn-outline btn-sm" id="btnAddRow">
+                        <i class="fas fa-plus me-1"></i> Thêm dòng
+                    </button>
+                </div>
+
+                <div class="table-responsive mb-3">
+                    <table class="table hr-table" id="detailTable">
+                        <thead>
+                            <tr>
+                                <th style="min-width:220px">Sản phẩm</th>
+                                <th style="width:120px">Số lượng</th>
+                                <th style="width:160px">Giá nhập (₫)</th>
+                                <th style="width:140px" class="text-end">Thành tiền</th>
+                                <th style="width:60px"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailRows">
+                            @for (var i = 0; i < Model.Details.Count; i++)
+                            {
+                                <tr class="detail-row" data-index="@i">
+                                    <td>
+                                        <select name="Details[@i].ProductId" class="form-select product-select">
+                                            <option value="">-- Chọn sản phẩm --</option>
+                                            @foreach (var opt in productOptions)
+                                            {
+                                                <option value="@opt.Value" selected="@(Model.Details[i].ProductId.ToString() == opt.Value)">@opt.Text</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input name="Details[@i].Quantity" type="number" min="1" class="form-control qty-input" value="@(Model.Details[i].Quantity > 0 ? Model.Details[i].Quantity : 1)" />
+                                    </td>
+                                    <td>
+                                        <input name="Details[@i].ImportPrice" type="number" min="0.01" step="1000" class="form-control price-input" value="@(Model.Details[i].ImportPrice > 0 ? Model.Details[i].ImportPrice : "")" placeholder="0" />
+                                    </td>
+                                    <td class="text-end line-total fw-semibold">0 ₫</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm hr-btn-warning btn-remove-row" title="Xóa dòng">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end hr-label">Tổng chi phí nhập kho</td>
+                                <td class="text-end">
+                                    <span id="totalCostDisplay" class="fs-5 fw-bold">0 ₫</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn hr-btn-primary btn-sm">
+                        <i class="fas fa-save me-1"></i> Lưu phiếu nhập
+                    </button>
+                    <a asp-action="Index" class="btn hr-btn-outline btn-sm">Hủy</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<template id="productOptionsTemplate">
+    <option value="">-- Chọn sản phẩm --</option>
+    @foreach (var opt in productOptions)
+    {
+        <option value="@opt.Value">@opt.Text</option>
+    }
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const tbody = document.getElementById('detailRows');
+            const btnAdd = document.getElementById('btnAddRow');
+            const totalDisplay = document.getElementById('totalCostDisplay');
+            const optionsHtml = document.getElementById('productOptionsTemplate').innerHTML;
+
+            function formatVnd(value) {
+                return new Intl.NumberFormat('vi-VN').format(Math.round(value)) + ' ₫';
+            }
+
+            function parseNumber(input) {
+                const n = parseFloat(String(input.value || '').replace(/,/g, ''));
+                return isNaN(n) ? 0 : n;
+            }
+
+            function recalcRow(row) {
+                const qty = parseNumber(row.querySelector('.qty-input'));
+                const price = parseNumber(row.querySelector('.price-input'));
+                const lineTotal = qty * price;
+                row.querySelector('.line-total').textContent = formatVnd(lineTotal);
+                return lineTotal;
+            }
+
+            function recalcTotal() {
+                let total = 0;
+                tbody.querySelectorAll('.detail-row').forEach(function (row) {
+                    total += recalcRow(row);
+                });
+                totalDisplay.textContent = formatVnd(total);
+            }
+
+            function reindexRows() {
+                tbody.querySelectorAll('.detail-row').forEach(function (row, index) {
+                    row.dataset.index = index;
+                    row.querySelector('.product-select').name = 'Details[' + index + '].ProductId';
+                    row.querySelector('.qty-input').name = 'Details[' + index + '].Quantity';
+                    row.querySelector('.price-input').name = 'Details[' + index + '].ImportPrice';
+                });
+            }
+
+            function bindRowEvents(row) {
+                row.querySelector('.qty-input').addEventListener('input', recalcTotal);
+                row.querySelector('.price-input').addEventListener('input', recalcTotal);
+                row.querySelector('.btn-remove-row').addEventListener('click', function () {
+                    if (tbody.querySelectorAll('.detail-row').length <= 1) {
+                        row.querySelector('.product-select').value = '';
+                        row.querySelector('.qty-input').value = '1';
+                        row.querySelector('.price-input').value = '';
+                        recalcTotal();
+                        return;
+                    }
+                    row.remove();
+                    reindexRows();
+                    recalcTotal();
+                });
+            }
+
+            btnAdd.addEventListener('click', function () {
+                const index = tbody.querySelectorAll('.detail-row').length;
+                const tr = document.createElement('tr');
+                tr.className = 'detail-row';
+                tr.dataset.index = index;
+                tr.innerHTML =
+                    '<td><select name="Details[' + index + '].ProductId" class="form-select product-select">' + optionsHtml + '</select></td>' +
+                    '<td><input name="Details[' + index + '].Quantity" type="number" min="1" class="form-control qty-input" value="1" /></td>' +
+                    '<td><input name="Details[' + index + '].ImportPrice" type="number" min="0.01" step="1000" class="form-control price-input" placeholder="0" /></td>' +
+                    '<td class="text-end line-total fw-semibold">0 ₫</td>' +
+                    '<td class="text-center"><button type="button" class="btn btn-sm hr-btn-warning btn-remove-row" title="Xóa dòng"><i class="fas fa-trash"></i></button></td>';
+                tbody.appendChild(tr);
+                bindRowEvents(tr);
+                recalcTotal();
+            });
+
+            tbody.querySelectorAll('.detail-row').forEach(bindRowEvents);
+            recalcTotal();
+        })();
+    </script>
+}

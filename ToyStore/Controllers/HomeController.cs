@@ -7,6 +7,8 @@ using ToyStore.Helpers;
 using ToyStore.Domain.Entities;
 using ToyStore.Domain.Interfaces;
 using ToyStore.Infrastructure.Data;
+using ToyStore.Attributes;
+using ToyStore.Services;
 
 namespace ToyStore.Controllers
 {
@@ -16,19 +18,23 @@ namespace ToyStore.Controllers
         private readonly ToyStoreContext _context;
         private readonly ISessionService _sessionService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IRecommendationService _recommendationService;
 
         public HomeController(
             ILogger<HomeController> logger,
             ToyStoreContext context,
             ISessionService sessionService,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            IRecommendationService recommendationService)
         {
             _logger = logger;
             _context = context;
             _sessionService = sessionService;
             _unitOfWork = unitOfWork;
+            _recommendationService = recommendationService;
         }
 
+        [TrackActivity]
         public async Task<IActionResult> Index(string searchName)
         {
             var user = _sessionService.GetUserSession(HttpContext);
@@ -72,6 +78,7 @@ namespace ToyStore.Controllers
             return View(categoriesWithProducts);
         }
 
+        [TrackActivity]
         public async Task<IActionResult> Shop(string? keyword, int? categoryId, decimal? minPrice, decimal? maxPrice)
         {
             var user = _sessionService.GetUserSession(HttpContext);
@@ -108,10 +115,12 @@ namespace ToyStore.Controllers
             return View(products);
         }
 
+        [TrackActivity]
         public async Task<IActionResult> ProductDetails(int id)
         {
             var product = await _context.Products
                 .Include(p => p.Category)
+                .Include(p => p.ProductImages.OrderBy(pi => pi.DisplayOrder))
                 .FirstOrDefaultAsync(p => p.ProductId == id);
 
             if (product == null)
@@ -121,6 +130,30 @@ namespace ToyStore.Controllers
 
             var user = _sessionService.GetUserSession(HttpContext);
             ViewBag.User = user;
+
+            try
+            {
+                var recommendedIds = await _recommendationService.GetRecommendedProductIdsAsync(id, 4);
+                if (recommendedIds.Count > 0)
+                {
+                    var recommendedProducts = await _context.Products
+                        .AsNoTracking()
+                        .Include(p => p.Category)
+                        .Where(p => recommendedIds.Contains(p.ProductId) && p.Status == true)
+                        .ToListAsync();
+
+                    // Giữ đúng thứ tự confidence từ Apriori.
+                    ViewBag.RecommendedProducts = recommendedIds
+                        .Select(rid => recommendedProducts.FirstOrDefault(p => p.ProductId == rid))
+                        .Where(p => p != null)
+                        .Cast<Product>()
+                        .ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Không tải được gợi ý sản phẩm Apriori cho ProductId={ProductId}", id);
+            }
 
             return View(product);
         }
@@ -155,6 +188,35 @@ namespace ToyStore.Controllers
             {
                 categories.Remove(category);
             }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> SearchSuggestions(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return Json(Array.Empty<object>());
+            }
+
+            var keyword = query.Trim();
+            var keywordLower = keyword.ToLower();
+
+            var suggestions = await _context.Products
+                .AsNoTracking()
+                .Where(p => p.Status == true
+                    && p.ProductName.ToLower().Contains(keywordLower))
+                .OrderBy(p => p.ProductName)
+                .Take(5)
+                .Select(p => new
+                {
+                    p.ProductId,
+                    p.ProductName,
+                    ImageUrl = p.ImageUrl ?? string.Empty,
+                    p.Price
+                })
+                .ToListAsync();
+
+            return Json(suggestions);
         }
     }
 }

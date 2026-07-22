@@ -92,17 +92,47 @@ public class PromotionRepository : GenericRepository<Promotion>, IPromotionRepos
 
     public async Task<IEnumerable<Promotion>> GetActivePromotionsAsync()
     {
+        // Lấy toàn bộ rồi lọc in-memory để tránh lệch so sánh TIMESTAMP/IsActive trên Oracle EF.
+        var promotions = await _dbSet
+            .AsNoTracking()
+            .ToListAsync();
+
         var now = DateTime.Now;
 
-        return await _dbSet
+        return promotions
             .Where(p => p.IsActive
                         && p.StartDate <= now
                         && p.EndDate >= now
-                        // UsageLimit = 0: không giới hạn lượt dùng; ngược lại phải còn lượt (UsedCount < UsageLimit).
                         && (p.UsageLimit == 0 || p.UsedCount < p.UsageLimit))
             .OrderBy(p => p.MinOrderValue)
             .ThenBy(p => p.EndDate)
-            .ToListAsync();
+            .ToList();
+    }
+
+    public async Task<bool> IncrementUsedCountAsync(string promotionCode)
+    {
+        if (string.IsNullOrWhiteSpace(promotionCode))
+        {
+            return false;
+        }
+
+        var normalizedCode = promotionCode.Trim();
+        var promo = await _dbSet
+            .FirstOrDefaultAsync(p => p.PromotionCode == normalizedCode);
+
+        if (promo == null)
+        {
+            return false;
+        }
+
+        if (promo.UsageLimit > 0 && promo.UsedCount >= promo.UsageLimit)
+        {
+            return false;
+        }
+
+        promo.UsedCount += 1;
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<bool> IsCodeExistsAsync(string promotionCode, int? excludeId = null)

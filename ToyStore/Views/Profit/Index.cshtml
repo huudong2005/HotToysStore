@@ -1,0 +1,88 @@
+@model ToyStore.Models.ProfitReportViewModel
+@{
+    ViewData["Title"] = "Phân tích Lợi nhuận Gộp";
+    string FormatVnd(decimal amount) =>
+        amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + " ₫";
+    var profitClass = Model.IsProfit ? "profit-metric-value--profit" : "profit-metric-value--loss";
+    var profitLabel = Model.IsProfit ? "Lợi nhuận" : "Lỗ";
+}
+
+@await Html.PartialAsync("_HrDarkThemeStyles")
+@await Html.PartialAsync("_ProfitDarkThemeStyles")
+
+<div class="container-fluid profit-page hr-page py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <h2 class="profit-title mb-0">
+            <i class="fas fa-chart-pie me-2"></i> Báo cáo Lợi nhuận Gộp
+        </h2>
+        <span class="badge profit-period-badge">Tháng @Model.Month/@Model.Year</span>
+    </div>
+
+    <div class="card profit-filter-card mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index" class="hr-filter-form row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="hr-label">Tháng</label>
+                    <select name="month" class="form-select">
+                        @for (var m = 1; m <= 12; m++)
+                        {
+                            <option value="@m" selected="@(Model.Month == m)">Tháng @m</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="hr-label">Năm</label>
+                    <select name="year" class="form-select">
+                        @foreach (var y in Enumerable.Range(DateTime.Now.Year - 2, 5))
+                        {
+                            <option value="@y" selected="@(Model.Year == y)">@y</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn hr-btn-outline btn-sm w-100">
+                        <i class="fas fa-filter me-1"></i> Xem báo cáo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card profit-metric-card h-100">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <p class="profit-metric-label mb-0">
+                        <i class="fas fa-coins me-1"></i> Tổng Doanh Thu
+                    </p>
+                    <p class="profit-metric-value">@FormatVnd(Model.TotalRevenue)</p>
+                    <p class="profit-metric-hint mb-0">Đơn hàng trạng thái "Hoàn thành"</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card profit-metric-card h-100">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <p class="profit-metric-label mb-0">
+                        <i class="fas fa-dolly me-1"></i> Chi Phí Nhập Hàng (COGS)
+                    </p>
+                    <p class="profit-metric-value">@FormatVnd(Model.TotalCogs)</p>
+                    <p class="profit-metric-hint mb-0">Tổng TotalCost phiếu nhập kho trong kỳ</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card profit-metric-card h-100">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <p class="profit-metric-label mb-0">
+                        <i class="fas fa-balance-scale me-1"></i> Lợi Nhuận Gộp
+                    </p>
+                    <p class="profit-metric-value @profitClass">@FormatVnd(Model.GrossProfit)</p>
+                    <p class="profit-metric-hint mb-0">
+                        @profitLabel · Doanh thu − Chi phí nhập hàng
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

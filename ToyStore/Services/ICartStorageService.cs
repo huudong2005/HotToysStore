@@ -12,4 +12,5 @@ public interface ICartStorageService
     Task RestoreCartAfterLoginAsync(HttpContext context, int customerId);
     Task PersistCartBeforeLogoutAsync(HttpContext context, int customerId);
     Task ClearCartAfterOrderAsync(HttpContext context, int customerId);
+    Task RemoveItemsAsync(HttpContext context, IEnumerable<int> cartItemIds, int customerId);
 }

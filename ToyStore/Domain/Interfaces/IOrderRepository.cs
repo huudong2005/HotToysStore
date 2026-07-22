@@ -9,6 +9,8 @@ public interface IOrderRepository : IGenericRepository<Order>
     Task<Order?> GetOrderWithDetailsAsync(int orderId);
     Task<IEnumerable<Order>> GetOrdersByStatusAsync(string status);
     Task<IEnumerable<PromotionStatisticViewModel>> GetPromotionStatisticsAsync(DateTime startDate, DateTime endDate);
+    Task<List<VoucherStatisticViewModel>> GetVoucherStatisticsAsync(DateTime startDate, DateTime endDate);
+    Task<List<TierStatisticViewModel>> GetTierStatisticsAsync(DateTime startDate, DateTime endDate);
 
     // Thêm mới cho Oracle Stored Procedure
     Task<int> DeleteOrderViaProcedureAsync(int orderId);

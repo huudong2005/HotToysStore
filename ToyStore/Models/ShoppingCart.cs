@@ -13,6 +13,16 @@ namespace ToyStore.Models
         /// Tên discount strategy được áp dụng (VipDiscount, SeasonalDiscount, NoDiscount)
         /// </summary>
         public string? DiscountStrategyName { get; set; }
+
+        /// <summary>
+        /// Mã voucher đã áp dụng (từ Session, trước khi checkout).
+        /// </summary>
+        public string? AppliedPromoCode { get; set; }
+
+        /// <summary>
+        /// Số tiền giảm từ voucher (từ SP_APPLY_PROMOTION / Session).
+        /// </summary>
+        public decimal AppliedPromoDiscount { get; set; }
         
         /// <summary>
         /// Tổng tiền trước khi giảm giá: ∑(Quantity × UnitPrice)
@@ -57,6 +67,7 @@ namespace ToyStore.Models
             {
                 Items.Add(new ShoppingCartItem
                 {
+                    CartItemId = product.ProductId,
                     ProductId = product.ProductId,
                     ProductName = product.ProductName,
                     Price = product.Price,
@@ -113,6 +124,11 @@ namespace ToyStore.Models
     
     public class ShoppingCartItem
     {
+        /// <summary>
+        /// ID dòng giỏ (CartItemID từ DB hoặc ProductId khi chỉ lưu session).
+        /// </summary>
+        public int CartItemId { get; set; }
+
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public decimal Price { get; set; }
@@ -120,5 +136,53 @@ namespace ToyStore.Models
         public string? ImageUrl { get; set; }
         
         public decimal Total => Price * Quantity;
+    }
+
+    public static class ShoppingCartExtensions
+    {
+        public static void EnsureCartItemIds(this ShoppingCart cart)
+        {
+            foreach (var item in cart.Items)
+            {
+                if (item.CartItemId == 0)
+                {
+                    item.CartItemId = item.ProductId;
+                }
+            }
+        }
+
+        public static ShoppingCart CreateSubset(this ShoppingCart cart, IEnumerable<int> cartItemIds)
+        {
+            var idSet = cartItemIds.ToHashSet();
+            var subset = new ShoppingCart
+            {
+                DiscountStrategyName = cart.DiscountStrategyName,
+                AppliedPromoCode = cart.AppliedPromoCode,
+                AppliedPromoDiscount = cart.AppliedPromoDiscount
+            };
+
+            foreach (var item in cart.Items.Where(i => idSet.Contains(i.CartItemId)))
+            {
+                subset.Items.Add(new ShoppingCartItem
+                {
+                    CartItemId = item.CartItemId,
+                    ProductId = item.ProductId,
+                    ProductName = item.ProductName,
+                    Price = item.Price,
+                    Quantity = item.Quantity,
+                    ImageUrl = item.ImageUrl
+                });
+            }
+
+            return subset;
+        }
+
+        public static decimal GetSubtotal(this ShoppingCart cart, IEnumerable<int> cartItemIds)
+        {
+            var idSet = cartItemIds.ToHashSet();
+            return cart.Items
+                .Where(i => idSet.Contains(i.CartItemId))
+                .Sum(i => i.Total);
+        }
     }
 }

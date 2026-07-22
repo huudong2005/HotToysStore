@@ -90,6 +90,108 @@ public class OrderRepository : GenericRepository<Order>, IOrderRepository
             .ToList();
     }
 
+    public async Task<List<VoucherStatisticViewModel>> GetVoucherStatisticsAsync(DateTime startDate, DateTime endDate)
+    {
+        const string completedStatus = "Hoàn thành";
+
+        var rawOrders = await _dbSet
+            .AsNoTracking()
+            .Where(o => o.OrderDate.HasValue
+                && o.OrderDate.Value >= startDate
+                && o.OrderDate.Value <= endDate
+                && o.DiscountValue > 0)
+            .Select(o => new
+            {
+                o.Status,
+                o.DiscountStrategyName,
+                o.DiscountValue
+            })
+            .ToListAsync();
+
+        var promotionCodes = await _context.Promotions
+            .AsNoTracking()
+            .Select(p => p.PromotionCode)
+            .ToListAsync();
+
+        var knownCodes = new HashSet<string>(promotionCodes, StringComparer.OrdinalIgnoreCase);
+
+        var voucherRows = rawOrders
+            .Where(o => string.Equals(o.Status, completedStatus, StringComparison.Ordinal))
+            .Select(o =>
+            {
+                var strategy = o.DiscountStrategyName;
+                string code;
+
+                if (!System.String.IsNullOrWhiteSpace(strategy) && knownCodes.Contains(strategy))
+                {
+                    code = strategy;
+                }
+                else if (!System.String.IsNullOrWhiteSpace(strategy)
+                         && !string.Equals(strategy, "NoDiscount", StringComparison.OrdinalIgnoreCase))
+                {
+                    code = strategy;
+                }
+                else
+                {
+                    code = "Không dùng mã";
+                }
+
+                return new
+                {
+                    PromotionCode = code,
+                    o.DiscountValue
+                };
+            })
+            .Where(x => !string.Equals(x.PromotionCode, "Không dùng mã", StringComparison.Ordinal))
+            .ToList();
+
+        return voucherRows
+            .GroupBy(x => x.PromotionCode, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new VoucherStatisticViewModel
+            {
+                PromotionCode = g.Key,
+                UsageCount = g.Count(),
+                TotalDiscount = g.Sum(x => x.DiscountValue)
+            })
+            .OrderByDescending(x => x.TotalDiscount)
+            .Take(10)
+            .ToList();
+    }
+
+    public async Task<List<TierStatisticViewModel>> GetTierStatisticsAsync(DateTime startDate, DateTime endDate)
+    {
+        const string completedStatus = "Hoàn thành";
+
+        var rawOrders = await (
+            from o in _dbSet.AsNoTracking()
+            join c in _context.Customers.AsNoTracking() on o.CustomerId equals c.CustomerId
+            join t in _context.MembershipTiers.AsNoTracking() on c.TierId equals t.TierId into tierJoin
+            from t in tierJoin.DefaultIfEmpty()
+            where o.OrderDate.HasValue
+                && o.OrderDate.Value >= startDate
+                && o.OrderDate.Value <= endDate
+                && o.MembershipDiscountValue > 0
+            select new
+            {
+                o.Status,
+                TierName = t.TierName,
+                o.MembershipDiscountValue
+            }).ToListAsync();
+
+        return rawOrders
+            .Where(o => string.Equals(o.Status, completedStatus, StringComparison.Ordinal))
+            .GroupBy(x => System.String.IsNullOrWhiteSpace(x.TierName) ? "Chưa có hạng" : x.TierName!)
+            .Select(g => new TierStatisticViewModel
+            {
+                TierName = g.Key,
+                OrderCount = g.Count(),
+                TotalMembershipDiscount = g.Sum(x => x.MembershipDiscountValue)
+            })
+            .OrderByDescending(x => x.TotalMembershipDiscount)
+            .Take(10)
+            .ToList();
+    }
+
     // ---- TRIỂN KHAI STORED PROCEDURE ----
     public async Task<int> DeleteOrderViaProcedureAsync(int orderId)
     {

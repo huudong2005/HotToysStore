@@ -69,12 +69,22 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Ảnh sản phẩm</label>
+                            <label class="form-label">Ảnh chính</label>
                             <input type="file" name="imageFile" class="form-control" accept="image/*" />
                             <small class="form-text text-muted">Chấp nhận jpg, jpeg, png, webp, gif — tối đa 10MB (tùy chọn)</small>
                             @if (ViewData.ModelState["imageFile"]?.Errors.Count > 0)
                             {
                                 <span class="text-danger small">@ViewData.ModelState["imageFile"]!.Errors[0].ErrorMessage</span>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label mt-3">Ảnh thư viện (Có thể chọn nhiều ảnh cùng lúc)</label>
+                            <input type="file" name="galleryFiles" class="form-control" accept="image/*" multiple />
+                            <small class="form-text text-muted">Chọn nhiều ảnh để tạo bộ sưu tập hiển thị ngoài trang khách hàng</small>
+                            @if (ViewData.ModelState["galleryFiles"]?.Errors.Count > 0)
+                            {
+                                <span class="text-danger small">@ViewData.ModelState["galleryFiles"]!.Errors[0].ErrorMessage</span>
                             }
                         </div>
 

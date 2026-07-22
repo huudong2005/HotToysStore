@@ -61,8 +61,11 @@
 
                 <!-- Search Bar (giữ nguyên logic: GET /Home, field "searchName") -->
                 <form method="get" action="/Home" class="cinematic-hero__search">
-                    <input type="text" name="searchName" value="@ViewBag.SearchName"
-                           class="cinematic-hero__input" placeholder="Tìm kiếm sản phẩm..." autocomplete="off" />
+                    <div class="cinematic-hero__search-field">
+                        <input type="text" id="homeSearchInput" name="searchName" value="@ViewBag.SearchName"
+                               class="cinematic-hero__input" placeholder="Tìm kiếm sản phẩm..." autocomplete="off" />
+                        <div id="searchSuggestions" class="search-suggestions-dropdown d-none"></div>
+                    </div>
                     <button type="submit" class="cinematic-hero__btn">
                         <i class="fas fa-search me-2"></i>Tìm kiếm
                     </button>
@@ -405,9 +408,17 @@
         border: 1px solid rgba(255,255,255,0.5);
         background: rgba(0,0,0,0.25);
         backdrop-filter: blur(4px);
+        position: relative;
+    }
+
+    .cinematic-hero__search-field {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
     .cinematic-hero__input {
+        width: 100%;
         flex: 1 1 auto;
         background: transparent;
         border: none;
@@ -417,6 +428,81 @@
         font-weight: 300;
         letter-spacing: 0.02em;
         padding: 0.95rem 1.25rem;
+    }
+
+    .search-suggestions-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        z-index: 1000;
+        background-color: #111;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: none;
+        max-height: 400px;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        text-align: left;
+    }
+
+    .search-suggestion-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 0.85rem;
+        text-decoration: none;
+        color: var(--lux-white, #fff);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        transition: background-color 0.25s ease;
+    }
+
+    .search-suggestion-item:last-child {
+        border-bottom: none;
+    }
+
+    .search-suggestion-item:hover,
+    .search-suggestion-item:focus {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: var(--lux-white, #fff);
+    }
+
+    .search-suggestion-item__thumb {
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+        object-fit: cover;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #1a1a1a;
+    }
+
+    .search-suggestion-item__info {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .search-suggestion-item__name {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.88rem;
+        font-weight: 400;
+        color: var(--lux-white, #fff);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 0.15rem;
+    }
+
+    .search-suggestion-item__price {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .search-suggestions-empty {
+        padding: 1rem;
+        color: var(--lux-muted, #b3b3b3);
+        font-size: 0.88rem;
+        font-family: 'Inter', sans-serif;
     }
 
     .cinematic-hero__input::placeholder { color: var(--lux-faint, #808080); }
@@ -903,6 +989,120 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- Auto-suggest tìm kiếm sản phẩm ---
+        (function initSearchSuggestions() {
+            var input = document.getElementById('homeSearchInput');
+            var dropdown = document.getElementById('searchSuggestions');
+            if (!input || !dropdown) return;
+
+            var debounceTimer = null;
+            var activeController = null;
+            var placeholderImg = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"%3E%3Crect fill="%231a1a1a" width="40" height="40"/%3E%3Ctext x="50%25" y="54%25" fill="%23808080" font-size="8" text-anchor="middle" font-family="sans-serif"%3EN/A%3C/text%3E%3C/svg%3E';
+
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text || '';
+                return div.innerHTML;
+            }
+
+            function formatPrice(price) {
+                return new Intl.NumberFormat('vi-VN').format(price) + ' \u20ab';
+            }
+
+            function hideDropdown() {
+                dropdown.classList.add('d-none');
+                dropdown.innerHTML = '';
+            }
+
+            function showDropdown() {
+                dropdown.classList.remove('d-none');
+            }
+
+            function renderSuggestions(items) {
+                dropdown.innerHTML = '';
+
+                if (!items || items.length === 0) {
+                    dropdown.innerHTML = '<div class="search-suggestions-empty">Không tìm thấy sản phẩm...</div>';
+                    showDropdown();
+                    return;
+                }
+
+                items.forEach(function (item) {
+                    var link = document.createElement('a');
+                    link.className = 'search-suggestion-item';
+                    link.href = '/Home/ProductDetails/' + item.productId;
+
+                    var imgSrc = item.imageUrl ? item.imageUrl : placeholderImg;
+                    link.innerHTML =
+                        '<img class="search-suggestion-item__thumb" src="' + escapeHtml(imgSrc) + '" alt="" loading="lazy" />' +
+                        '<div class="search-suggestion-item__info">' +
+                        '<div class="search-suggestion-item__name">' + escapeHtml(item.productName) + '</div>' +
+                        '<div class="search-suggestion-item__price">' + formatPrice(item.price) + '</div>' +
+                        '</div>';
+
+                    link.addEventListener('click', hideDropdown);
+                    dropdown.appendChild(link);
+                });
+
+                showDropdown();
+            }
+
+            function fetchSuggestions(keyword) {
+                if (activeController) {
+                    activeController.abort();
+                }
+
+                activeController = new AbortController();
+
+                fetch('/Home/SearchSuggestions?query=' + encodeURIComponent(keyword), {
+                    signal: activeController.signal,
+                    headers: { 'Accept': 'application/json' }
+                })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error('Request failed');
+                        return res.json();
+                    })
+                    .then(function (data) { renderSuggestions(data); })
+                    .catch(function (err) {
+                        if (err.name !== 'AbortError') hideDropdown();
+                    });
+            }
+
+            input.addEventListener('input', function () {
+                var keyword = input.value.trim();
+
+                clearTimeout(debounceTimer);
+
+                if (!keyword) {
+                    hideDropdown();
+                    return;
+                }
+
+                debounceTimer = setTimeout(function () {
+                    fetchSuggestions(keyword);
+                }, 300);
+            });
+
+            input.addEventListener('focus', function () {
+                var keyword = input.value.trim();
+                if (keyword && dropdown.innerHTML) {
+                    showDropdown();
+                } else if (keyword) {
+                    fetchSuggestions(keyword);
+                }
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                    hideDropdown();
+                }
+            });
+
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') hideDropdown();
+            });
+        })();
+
         // Check if user is logged in and redirected from login
         var userLoggedIn = @(user != null ? "true" : "false");
         

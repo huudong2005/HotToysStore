@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using ToyStore.Helpers;
 using ToyStore.Models;
 using ToyStore.Services;
@@ -16,24 +17,29 @@ namespace ToyStore.Controllers
         private readonly ISessionService _sessionService;
         private readonly ICartStorageService _cartStorage;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly GhnSettings _ghnSettings;
 
         public CartController(
             ToyStoreContext context,
             DiscountService discountService,
             ISessionService sessionService,
             ICartStorageService cartStorage,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            IOptions<GhnSettings> ghnSettings)
         {
             _context = context;
             _discountService = discountService;
             _sessionService = sessionService;
             _cartStorage = cartStorage;
             _unitOfWork = unitOfWork;
+            _ghnSettings = ghnSettings.Value;
         }
 
         public async Task<IActionResult> Index()
         {
             var cart = await _cartStorage.GetCartAsync(HttpContext);
+            cart.EnsureCartItemIds();
+            await _cartStorage.SaveCartAsync(HttpContext, cart);
             ViewBag.DiscountStrategies = _discountService.GetAllStrategies();
             ViewBag.IsLoggedIn = _sessionService.IsCustomer(HttpContext);
 
@@ -49,8 +55,8 @@ namespace ToyStore.Controllers
             }
 
             // Khôi phục mã khuyến mãi đã áp dụng (nếu có) để hiển thị lại sau khi reload trang.
-            ViewBag.AppliedPromoCode = HttpContext.Session.GetString("AppliedPromoCode");
-            var storedDiscount = HttpContext.Session.GetString("DiscountValue");
+            ViewBag.AppliedPromoCode = HttpContext.Session.GetString(PromoSessionHelper.AppliedPromoCodeKey);
+            var storedDiscount = HttpContext.Session.GetString(PromoSessionHelper.DiscountValueKey);
             decimal appliedDiscount = 0m;
             if (!string.IsNullOrEmpty(storedDiscount))
             {
@@ -113,38 +119,68 @@ namespace ToyStore.Controllers
         [HttpPost]
         public async Task<IActionResult> Update(int productId, int quantity)
         {
+            var wantsJson = WantsJsonResponse();
+
             try
             {
+                if (quantity < 1)
+                {
+                    return wantsJson
+                        ? Json(new { success = false, message = "Số lượng phải lớn hơn 0." })
+                        : RedirectToAction("Index");
+                }
+
                 var product = await _context.Products.FindAsync(productId);
                 if (product == null)
                 {
-                    TempData["ErrorMessage"] = "Sản phẩm không tồn tại";
-                    return RedirectToAction("Index");
+                    return wantsJson
+                        ? Json(new { success = false, message = "Sản phẩm không tồn tại." })
+                        : CartRedirect("Sản phẩm không tồn tại", false);
                 }
 
                 if (product.Stock < quantity)
                 {
-                    TempData["ErrorMessage"] = $"Số lượng sản phẩm không đủ. Chỉ còn {product.Stock} sản phẩm trong kho";
-                    return RedirectToAction("Index");
+                    var stockMsg = $"Số lượng sản phẩm không đủ. Chỉ còn {product.Stock} sản phẩm trong kho.";
+                    return wantsJson
+                        ? Json(new { success = false, message = stockMsg, maxStock = product.Stock })
+                        : CartRedirect(stockMsg, false);
                 }
 
                 var cart = await _cartStorage.GetCartAsync(HttpContext);
                 cart.UpdateQuantity(productId, quantity);
                 await _cartStorage.SaveCartAsync(HttpContext, cart);
 
+                var updatedItem = cart.Items.FirstOrDefault(i => i.ProductId == productId);
+
+                if (wantsJson)
+                {
+                    return Json(new
+                    {
+                        success = true,
+                        message = "Đã cập nhật số lượng.",
+                        productId,
+                        quantity = updatedItem?.Quantity ?? quantity,
+                        lineTotal = updatedItem?.Total ?? 0m,
+                        unitPrice = updatedItem?.Price ?? product.Price
+                    });
+                }
+
                 TempData["SuccessMessage"] = "Đã cập nhật giỏ hàng";
                 return RedirectToAction("Index");
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
-                return RedirectToAction("Index");
+                return wantsJson
+                    ? Json(new { success = false, message = "Lỗi: " + ex.Message })
+                    : CartRedirect("Lỗi: " + ex.Message, false);
             }
         }
 
         [HttpPost]
         public async Task<IActionResult> Remove(int productId)
         {
+            var wantsJson = WantsJsonResponse();
+
             try
             {
                 var cart = await _cartStorage.GetCartAsync(HttpContext);
@@ -154,6 +190,23 @@ namespace ToyStore.Controllers
                 {
                     cart.RemoveItem(productId);
                     await _cartStorage.SaveCartAsync(HttpContext, cart);
+                }
+
+                if (wantsJson)
+                {
+                    return Json(new
+                    {
+                        success = true,
+                        message = item != null
+                            ? $"Đã xóa {item.ProductName} khỏi giỏ hàng."
+                            : "Đã xóa sản phẩm khỏi giỏ hàng.",
+                        productId,
+                        isEmpty = !cart.Items.Any()
+                    });
+                }
+
+                if (item != null)
+                {
                     TempData["SuccessMessage"] = $"Đã xóa {item.ProductName} khỏi giỏ hàng";
                 }
 
@@ -161,8 +214,9 @@ namespace ToyStore.Controllers
             }
             catch (Exception ex)
             {
-                TempData["ErrorMessage"] = "Lỗi: " + ex.Message;
-                return RedirectToAction("Index");
+                return wantsJson
+                    ? Json(new { success = false, message = "Lỗi: " + ex.Message })
+                    : CartRedirect("Lỗi: " + ex.Message, false);
             }
         }
 
@@ -214,13 +268,32 @@ namespace ToyStore.Controllers
                 }
 
                 var cart = await _cartStorage.GetCartAsync(HttpContext);
+                cart.EnsureCartItemIds();
                 if (!cart.Items.Any())
                 {
                     return Json(new { success = false, message = "Giỏ hàng đang trống, không thể áp dụng mã." });
                 }
 
-                // Tổng tiền hàng hiện tại của giỏ làm cơ sở tính khuyến mãi.
-                decimal orderValue = cart.Subtotal;
+                var selectedIds = request?.SelectedCartItemIds?
+                    .Where(id => id > 0)
+                    .Distinct()
+                    .ToList();
+
+                decimal orderValue;
+                if (selectedIds != null && selectedIds.Count > 0)
+                {
+                    orderValue = cart.GetSubtotal(selectedIds);
+                    if (orderValue <= 0)
+                    {
+                        return Json(new { success = false, message = "Vui lòng chọn ít nhất 1 sản phẩm để áp dụng mã." });
+                    }
+                }
+                else
+                {
+                    orderValue = cart.Subtotal;
+                }
+
+                // Tổng tiền hàng được chọn làm cơ sở tính khuyến mãi.
 
                 var (resultCode, discountValue, message) =
                     await _unitOfWork.Promotions.ApplyPromotionAsync(promoCode, orderValue);
@@ -234,8 +307,8 @@ namespace ToyStore.Controllers
                     decimal finalTotal = orderValue - discountValue;
 
                     // Lưu vào Session để dùng lại lúc Thanh toán.
-                    HttpContext.Session.SetString("AppliedPromoCode", promoCode);
-                    HttpContext.Session.SetString("DiscountValue", discountValue.ToString(CultureInfo.InvariantCulture));
+                    HttpContext.Session.SetString(PromoSessionHelper.AppliedPromoCodeKey, promoCode);
+                    HttpContext.Session.SetString(PromoSessionHelper.DiscountValueKey, discountValue.ToString(CultureInfo.InvariantCulture));
 
                     return Json(new
                     {
@@ -249,8 +322,8 @@ namespace ToyStore.Controllers
                 }
 
                 // Thất bại: xóa mã đã lưu trước đó (nếu có).
-                HttpContext.Session.Remove("AppliedPromoCode");
-                HttpContext.Session.Remove("DiscountValue");
+                HttpContext.Session.Remove(PromoSessionHelper.AppliedPromoCodeKey);
+                HttpContext.Session.Remove(PromoSessionHelper.DiscountValueKey);
 
                 return Json(new
                 {
@@ -270,15 +343,33 @@ namespace ToyStore.Controllers
             return amount.ToString("#,##0", CultureInfo.InvariantCulture) + "đ";
         }
 
-        public async Task<IActionResult> Checkout()
+        public async Task<IActionResult> Checkout(List<int>? selectedItems)
         {
-            var cart = await _cartStorage.GetCartAsync(HttpContext);
+            if (selectedItems == null || !selectedItems.Any())
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn ít nhất 1 sản phẩm.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var fullCart = await _cartStorage.GetCartAsync(HttpContext);
+            fullCart.EnsureCartItemIds();
+
+            if (!fullCart.Items.Any())
+            {
+                TempData["ErrorMessage"] = "Giỏ hàng trống, không thể thanh toán";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var distinctSelected = selectedItems.Where(id => id > 0).Distinct().ToList();
+            var cart = fullCart.CreateSubset(distinctSelected);
 
             if (!cart.Items.Any())
             {
-                TempData["ErrorMessage"] = "Giỏ hàng trống, không thể thanh toán";
-                return RedirectToAction("Index");
+                TempData["ErrorMessage"] = "Không tìm thấy sản phẩm đã chọn trong giỏ hàng.";
+                return RedirectToAction(nameof(Index));
             }
+
+            CartSelectionHelper.SaveSelectedIds(HttpContext, distinctSelected);
 
             ViewBag.Cart = cart;
             ViewBag.DiscountStrategies = _discountService.GetAllStrategies();
@@ -288,7 +379,7 @@ namespace ToyStore.Controllers
             decimal discountValue = 0m;
             try
             {
-                var storedDiscount = HttpContext.Session.GetString("DiscountValue");
+                var storedDiscount = HttpContext.Session.GetString(PromoSessionHelper.DiscountValueKey);
                 if (!string.IsNullOrWhiteSpace(storedDiscount))
                 {
                     decimal.TryParse(storedDiscount, NumberStyles.Any, CultureInfo.InvariantCulture, out discountValue);
@@ -353,8 +444,12 @@ namespace ToyStore.Controllers
             ViewBag.MembershipDiscountValue = membershipDiscountValue;
             ViewBag.TierName = tierName;
             ViewBag.FinalTotal = finalTotal;
+            ViewBag.FallbackShippingFee = 30_000m;
+            ViewBag.MaxCodAmount = _ghnSettings.MaxCodAmount;
+            ViewBag.GhnCodLimitMessage = GhnCodHelper.GetLargeOrderNoticeMessage(_ghnSettings.MaxCodAmount);
+            ViewBag.GhnCodConfirmMessage = GhnCodHelper.GetLargeOrderConfirmMessage();
 
-            return View(model);
+            return View("~/Views/Checkout/Index.cshtml", model);
         }
 
         public async Task<IActionResult> GetCount()
@@ -362,11 +457,33 @@ namespace ToyStore.Controllers
             var cart = await _cartStorage.GetCartAsync(HttpContext);
             return Json(new { count = cart.ItemCount });
         }
+
+        private bool WantsJsonResponse()
+        {
+            var accept = Request.Headers.Accept.ToString();
+            return accept.Contains("application/json", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private IActionResult CartRedirect(string message, bool success)
+        {
+            if (success)
+            {
+                TempData["SuccessMessage"] = message;
+            }
+            else
+            {
+                TempData["ErrorMessage"] = message;
+            }
+
+            return RedirectToAction("Index");
+        }
     }
 
     // Body của request áp mã khuyến mãi gửi từ trang giỏ hàng.
     public class ApplyPromoRequest
     {
         public string? PromoCode { get; set; }
+
+        public List<int>? SelectedCartItemIds { get; set; }
     }
 }

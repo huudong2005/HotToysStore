@@ -53,6 +53,11 @@
                             @if (Context.Session.GetString("UserType") == "Admin" || Context.Session.GetString("UserType") == "Staff")
                             {
                                 <li class="nav-item">
+                                    <a class="nav-link" asp-area="" asp-controller="Pos" asp-action="Index">
+                                        <i class="fas fa-cash-register"></i> POS
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link" asp-area="" asp-controller="Products" asp-action="Index">
                                         <i class="fas fa-box"></i> Sản phẩm
                                     </a>
@@ -76,10 +81,17 @@
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-dark">
                                         <li><a class="dropdown-item" asp-controller="Customers" asp-action="Index"><i class="fas fa-users"></i> Khách hàng</a></li>
+                                        <li><a class="dropdown-item" asp-controller="ActivityLog" asp-action="Index"><i class="fas fa-history"></i> Lịch sử hành vi</a></li>
                                         <li><a class="dropdown-item" asp-controller="Staff" asp-action="Index"><i class="fas fa-user-tie"></i> Nhân viên</a></li>
+                                        <li><a class="dropdown-item" asp-controller="WorkShift" asp-action="Index"><i class="fas fa-calendar-alt"></i> Ca làm việc</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Payroll" asp-action="Index"><i class="fas fa-money-check-alt"></i> Bảng lương</a></li>
+                                        <li><a class="dropdown-item" asp-controller="GoodsReceipt" asp-action="Index"><i class="fas fa-warehouse"></i> Nhập kho</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Profit" asp-action="Index"><i class="fas fa-chart-pie"></i> Lợi nhuận gộp</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Pos" asp-action="Index"><i class="fas fa-cash-register"></i> Bán hàng POS</a></li>
                                         <li><a class="dropdown-item" asp-controller="Products" asp-action="Index"><i class="fas fa-box"></i> Sản phẩm</a></li>
                                         <li><a class="dropdown-item" asp-controller="Categories" asp-action="Index"><i class="fas fa-list"></i> Danh mục</a></li>
                                         <li><a class="dropdown-item" asp-controller="Orders" asp-action="Index"><i class="fas fa-clipboard-list"></i> Đơn hàng</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Support" asp-action="Index"><i class="fas fa-headset"></i> Trò chuyện hỗ trợ</a></li>
                                         <li><a class="dropdown-item" asp-controller="Promotions" asp-action="Index"><i class="fas fa-gift"></i> Quản lý Khuyến mãi</a></li>
                                         <li><a class="dropdown-item" asp-controller="Banners" asp-action="Index"><i class="fas fa-image"></i> Quản lý Banner</a></li>
                                         <li><a class="dropdown-item" asp-controller="Statistics" asp-action="Index"><i class="fas fa-chart-line"></i> Thống kê doanh thu</a></li>
@@ -94,9 +106,11 @@
                                         <i class="fas fa-cog"></i> Quản lý
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-dark">
+                                        <li><a class="dropdown-item" asp-controller="Pos" asp-action="Index"><i class="fas fa-cash-register"></i> Bán hàng POS</a></li>
                                         <li><a class="dropdown-item" asp-controller="Products" asp-action="Index"><i class="fas fa-box"></i> Sản phẩm</a></li>
                                         <li><a class="dropdown-item" asp-controller="Categories" asp-action="Index"><i class="fas fa-list"></i> Danh mục</a></li>
                                         <li><a class="dropdown-item" asp-controller="Orders" asp-action="Index"><i class="fas fa-clipboard-list"></i> Đơn hàng</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Support" asp-action="Index"><i class="fas fa-headset"></i> Trò chuyện hỗ trợ</a></li>
                                     </ul>
                                 </li>
                             }
@@ -152,6 +166,10 @@
                                 </li>
                             </ul>
                         </li>
+                        @if (Context.Session.GetString("UserType") == "Admin" || Context.Session.GetString("UserType") == "Staff")
+                        {
+                            @await Html.PartialAsync("_AdminLayout", null, new ViewDataDictionary(ViewData) { { "AdminLayoutSection", "Navbar" } })
+                        }
                         @if (Context.Session.GetString("IsAuthenticated") == "True")
                         {
                             <li class="nav-item dropdown">
@@ -211,16 +229,20 @@
             <p>&copy; 2025 - ToyStore - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a></p>
         </div>
     </footer>
+    @{
+        var liveChatCustomerName = Context.Session.GetString("FullName") ?? "Khách hàng";
+        var hideLiveChat = Context.Session.GetString("UserType") == "Admin" || Context.Session.GetString("UserType") == "Staff";
+    }
     <!-- ====== ToyStore Assistant - Floating Chat Widget ====== -->
     <div id="toystore-chat">
         <!-- Cửa sổ chat (mặc định ẩn) -->
         <div id="chat-window" class="chat-window">
             <div class="chat-header">
                 <div class="chat-header-info">
-                    <i class="fas fa-robot"></i>
+                    <i class="fas fa-robot" id="chat-header-icon"></i>
                     <div>
-                        <div class="chat-header-title">ToyStore Assistant</div>
-                        <div class="chat-header-status"><span class="status-dot"></span> Đang hoạt động</div>
+                        <div class="chat-header-title" id="chat-header-title">ToyStore Assistant</div>
+                        <div class="chat-header-status"><span class="status-dot"></span> <span id="chat-header-status-text">Đang hoạt động</span></div>
                     </div>
                 </div>
                 <button type="button" id="chat-close" class="chat-close" aria-label="Đóng">
@@ -233,6 +255,18 @@
                     <div class="chat-bubble">Xin chào! 👋 Tôi là <b>ToyStore Assistant</b>. Bạn cần tìm đồ chơi gì hay hỏi giá sản phẩm nào ạ?</div>
                 </div>
             </div>
+
+            @if (!hideLiveChat)
+            {
+                <div class="chat-live-support-bar">
+                    <button type="button" id="btnRequestSupport" class="btn btn-request-support">
+                        <i class="fas fa-headset me-1"></i> Trò chuyện với nhân viên
+                    </button>
+                    <button type="button" id="btnDisconnectSupport" class="btn btn-disconnect-support" hidden>
+                        <i class="fas fa-phone-slash me-1"></i> Ngắt kết nối
+                    </button>
+                </div>
+            }
 
             <div class="chat-input-area">
                 <input type="text" id="chat-input" class="chat-input" placeholder="Nhập câu hỏi của bạn..." autocomplete="off" />
@@ -254,6 +288,8 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@@8.0.7/dist/browser/signalr.min.js"></script>
+
     <script>
         (function () {
             const toggleBtn = document.getElementById('chat-toggle');
@@ -263,34 +299,43 @@
             const messagesEl = document.getElementById('chat-messages');
             const inputEl = document.getElementById('chat-input');
             const sendBtn = document.getElementById('chat-send');
+            const btnRequestSupport = document.getElementById('btnRequestSupport');
+            const btnDisconnectSupport = document.getElementById('btnDisconnectSupport');
+            const chatHeaderTitle = document.getElementById('chat-header-title');
+            const chatHeaderStatusText = document.getElementById('chat-header-status-text');
+            const chatHeaderIcon = document.getElementById('chat-header-icon');
 
-            // Bật / tắt cửa sổ chat
+            const customerName = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(liveChatCustomerName));
+            const LIVE_SESSION_KEY = 'toystore_live_session_id';
+
+            let isLiveChat = false;
+            let liveSessionId = parseInt(sessionStorage.getItem(LIVE_SESSION_KEY) || '0', 10) || null;
+            let hubConnection = null;
+
             function toggleChat() {
                 const isOpen = chatWindow.classList.toggle('open');
                 toggleIcon.className = isOpen ? 'fas fa-times' : 'fas fa-comment-dots';
                 if (isOpen) {
                     inputEl.focus();
                     scrollToBottom();
+                    ensureHubConnection();
                 }
             }
 
             toggleBtn.addEventListener('click', toggleChat);
             closeBtn.addEventListener('click', toggleChat);
 
-            // Tự cuộn xuống cuối khung chat
             function scrollToBottom() {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
 
-            // Hiển thị 1 tin nhắn lên khung chat
-            function appendMessage(html, sender) {
+            function appendMessage(html, sender, asText) {
                 const wrap = document.createElement('div');
                 wrap.className = 'chat-msg ' + (sender === 'user' ? 'chat-msg-user' : 'chat-msg-bot');
 
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-bubble';
-                // Tin nhắn người dùng: hiển thị dạng text thuần; tin Bot: cho phép HTML từ server
-                if (sender === 'user') {
+                if (asText || sender === 'user') {
                     bubble.textContent = html;
                 } else {
                     bubble.innerHTML = html;
@@ -301,7 +346,10 @@
                 scrollToBottom();
             }
 
-            // Hiệu ứng "Bot đang gõ..."
+            function appendSystemMessage(text) {
+                appendMessage(text, 'bot', true);
+            }
+
             function showTyping() {
                 const typing = document.createElement('div');
                 typing.className = 'chat-msg chat-msg-bot';
@@ -317,30 +365,202 @@
                 if (typing) typing.remove();
             }
 
-            // Gửi tin nhắn tới API
+            function setLiveChatUi(active) {
+                isLiveChat = active;
+                if (!chatHeaderTitle || !chatHeaderStatusText || !chatHeaderIcon) return;
+
+                if (active) {
+                    chatHeaderTitle.textContent = 'Live Chat';
+                    chatHeaderStatusText.textContent = 'Đang kết nối với nhân viên...';
+                    chatHeaderIcon.className = 'fas fa-headset';
+                    inputEl.placeholder = 'Nhập tin nhắn gửi nhân viên...';
+                    if (btnRequestSupport) btnRequestSupport.hidden = true;
+                    if (btnDisconnectSupport) btnDisconnectSupport.hidden = false;
+                } else {
+                    chatHeaderTitle.textContent = 'ToyStore Assistant';
+                    chatHeaderStatusText.textContent = 'Đang hoạt động';
+                    chatHeaderIcon.className = 'fas fa-robot';
+                    inputEl.placeholder = 'Nhập câu hỏi của bạn...';
+                    if (btnRequestSupport) {
+                        btnRequestSupport.hidden = false;
+                        btnRequestSupport.disabled = false;
+                    }
+                    if (btnDisconnectSupport) {
+                        btnDisconnectSupport.hidden = true;
+                        btnDisconnectSupport.disabled = false;
+                    }
+                }
+            }
+
+            function clearLiveSessionState() {
+                liveSessionId = null;
+                sessionStorage.removeItem(LIVE_SESSION_KEY);
+            }
+
+            function exitLiveChatMode(message) {
+                if (!isLiveChat && !liveSessionId) return;
+
+                clearLiveSessionState();
+                setLiveChatUi(false);
+
+                if (message) {
+                    appendSystemMessage(message);
+                }
+            }
+
+            async function ensureHubConnection() {
+                if (typeof signalR === 'undefined') {
+                    throw new Error('Thư viện SignalR chưa được tải.');
+                }
+
+                if (hubConnection && hubConnection.state === signalR.HubConnectionState.Connected) {
+                    return hubConnection;
+                }
+
+                if (!hubConnection) {
+                    hubConnection = new signalR.HubConnectionBuilder()
+                        .withUrl('/supporthub')
+                        .withAutomaticReconnect()
+                        .build();
+
+                    hubConnection.on('ReceiveMessage', function (sessionId, sender, message) {
+                        if (!isLiveChat || Number(sessionId) !== Number(liveSessionId)) return;
+                        if (sender === 'Customer') return;
+                        appendMessage(message, 'bot', true);
+                    });
+
+                    hubConnection.on('SessionStatusChanged', function (sessionId, status, initiator) {
+                        if (Number(sessionId) !== Number(liveSessionId) && isLiveChat) return;
+                        if (!chatHeaderStatusText) return;
+
+                        if (status === 'Active') {
+                            chatHeaderStatusText.textContent = 'Nhân viên đã kết nối';
+                            appendSystemMessage('Nhân viên đã tham gia cuộc trò chuyện. Bạn có thể nhắn tin ngay!');
+                        } else if (status === 'Closed') {
+                            const byStaff = initiator === 'Staff';
+                            exitLiveChatMode(
+                                byStaff
+                                    ? 'Nhân viên đã kết thúc phiên hỗ trợ. Bạn có thể tiếp tục chat với ToyStore Assistant.'
+                                    : 'Bạn đã ngắt kết nối Live Chat. Bạn có thể tiếp tục chat với ToyStore Assistant.'
+                            );
+                        }
+                    });
+                }
+
+                if (hubConnection.state === signalR.HubConnectionState.Disconnected) {
+                    await hubConnection.start();
+                }
+
+                return hubConnection;
+            }
+
+            async function createLiveSession(conn) {
+                liveSessionId = await conn.invoke('RequestSupport', customerName);
+                sessionStorage.setItem(LIVE_SESSION_KEY, String(liveSessionId));
+            }
+
+            async function startLiveSupport() {
+                if (btnRequestSupport) btnRequestSupport.disabled = true;
+
+                try {
+                    setLiveChatUi(true);
+                    appendSystemMessage('Đang kết nối với nhân viên...');
+
+                    const conn = await ensureHubConnection();
+
+                    if (liveSessionId) {
+                        try {
+                            const checkRes = await fetch('/Chat/CheckLiveSession?sessionId=' + encodeURIComponent(liveSessionId));
+                            const checkData = await checkRes.json();
+                            if (checkData.exists) {
+                                await conn.invoke('JoinRoom', liveSessionId);
+                            } else {
+                                liveSessionId = null;
+                                sessionStorage.removeItem(LIVE_SESSION_KEY);
+                                await createLiveSession(conn);
+                            }
+                        } catch {
+                            liveSessionId = null;
+                            sessionStorage.removeItem(LIVE_SESSION_KEY);
+                            await createLiveSession(conn);
+                        }
+                    } else {
+                        await createLiveSession(conn);
+                    }
+
+                    appendSystemMessage('Đã gửi yêu cầu hỗ trợ. Vui lòng chờ nhân viên phản hồi.');
+                } catch (err) {
+                    console.error('Live chat error:', err);
+                    clearLiveSessionState();
+                    setLiveChatUi(false);
+                    const detail = (err && err.message) ? err.message : '';
+                    appendSystemMessage('Không thể kết nối Live Chat. ' + (detail || 'Vui lòng thử lại sau.'));
+                } finally {
+                    if (btnRequestSupport && !isLiveChat) {
+                        btnRequestSupport.disabled = false;
+                    }
+                }
+            }
+
+            async function disconnectLiveSupport() {
+                if (!isLiveChat || !liveSessionId || !hubConnection) return;
+
+                if (btnDisconnectSupport) btnDisconnectSupport.disabled = true;
+                const closingSessionId = liveSessionId;
+
+                try {
+                    await hubConnection.invoke('DisconnectSupport', closingSessionId, 'Customer');
+                    exitLiveChatMode('Bạn đã ngắt kết nối Live Chat. Bạn có thể tiếp tục chat với ToyStore Assistant.');
+                } catch (err) {
+                    console.error('Disconnect live chat error:', err);
+                    appendSystemMessage('Không thể ngắt kết nối. Vui lòng thử lại.');
+                    if (btnDisconnectSupport) btnDisconnectSupport.disabled = false;
+                }
+            }
+
+            if (btnRequestSupport) {
+                btnRequestSupport.addEventListener('click', startLiveSupport);
+            }
+
+            if (btnDisconnectSupport) {
+                btnDisconnectSupport.addEventListener('click', disconnectLiveSupport);
+            }
+
             async function sendMessage() {
                 const text = inputEl.value.trim();
                 if (!text) return;
 
-                appendMessage(text, 'user');
+                appendMessage(text, 'user', true);
                 inputEl.value = '';
                 inputEl.focus();
 
-                showTyping();
+                if (isLiveChat && liveSessionId && hubConnection) {
+                    try {
+                        await hubConnection.invoke('SendMessage', liveSessionId, 'Customer', text);
+                    } catch (err) {
+                        const detail = (err && err.message) ? err.message : '';
+                        if (detail.indexOf('đã đóng') >= 0 || detail.indexOf('Closed') >= 0) {
+                            exitLiveChatMode('Phiên Live Chat đã kết thúc. Bạn có thể tiếp tục chat với ToyStore Assistant.');
+                        } else {
+                            appendSystemMessage('Gửi tin nhắn thất bại. Vui lòng thử lại.');
+                        }
+                    }
+                    return;
+                }
 
+                showTyping();
                 try {
                     const res = await fetch('/Chat/SendMessage', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ Message: text })
                     });
-
                     const data = await res.json();
                     removeTyping();
-                    appendMessage(data.response || 'Xin lỗi, đã có lỗi xảy ra.', 'bot');
+                    appendMessage(data.response || 'Xin lỗi, đã có lỗi xảy ra.', 'bot', false);
                 } catch (err) {
                     removeTyping();
-                    appendMessage('⚠️ Không thể kết nối tới máy chủ. Vui lòng thử lại sau!', 'bot');
+                    appendMessage('⚠️ Không thể kết nối tới máy chủ. Vui lòng thử lại sau!', 'bot', true);
                 }
             }
 
@@ -351,8 +571,32 @@
                     sendMessage();
                 }
             });
+
+            if (liveSessionId && btnRequestSupport) {
+                ensureHubConnection()
+                    .then(async function () {
+                        const checkRes = await fetch('/Chat/CheckLiveSession?sessionId=' + encodeURIComponent(liveSessionId));
+                        const checkData = await checkRes.json();
+                        if (!checkData.exists) {
+                            clearLiveSessionState();
+                            return;
+                        }
+                        return hubConnection.invoke('JoinRoom', liveSessionId);
+                    })
+                    .then(function () {
+                        if (liveSessionId) setLiveChatUi(true);
+                    })
+                    .catch(function () {
+                        clearLiveSessionState();
+                    });
+            }
         })();
     </script>
+
+    @if (Context.Session.GetString("UserType") == "Admin" || Context.Session.GetString("UserType") == "Staff")
+    {
+        @await Html.PartialAsync("_AdminLayout", null, new ViewDataDictionary(ViewData) { { "AdminLayoutSection", "Footer" } })
+    }
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

@@ -1,5 +1,6 @@
 using ToyStore.Domain.Entities;
 using ToyStore.Domain.Interfaces;
+using ToyStore.Helpers;
 using ToyStore.Models;
 using ToyStore.Services;
 
@@ -24,7 +25,12 @@ public class CheckoutFacade : ICheckoutFacade
     /// <summary>
     /// Thực hiện quy trình đặt hàng hoàn chỉnh
     /// </summary>
-    public async Task<Order> PlaceOrderAsync(ShoppingCart cart, int customerId, string? paymentMethod = null)
+    public async Task<Order> PlaceOrderAsync(
+        ShoppingCart cart,
+        int customerId,
+        string? paymentMethod = null,
+        decimal shippingFee = 0,
+        string? deliveryMethod = null)
     {
         // Bước 1: Kiểm tra giỏ hàng
         if (cart == null || !cart.Items.Any())
@@ -35,17 +41,35 @@ public class CheckoutFacade : ICheckoutFacade
         // Bước 2: Kiểm tra tồn kho cho tất cả sản phẩm
         await ValidateStockAvailabilityAsync(cart);
 
-        // Bước 3: Tính giá (sử dụng Strategy Pattern)
-        var (subtotal, discountValue, finalTotal) = CalculatePricing(cart);
+        // Bước 3: Tính giá (ưu tiên voucher từ Session, fallback Strategy Pattern)
+        var (subtotal, discountValue, finalTotal, discountStrategyName) = CalculatePricing(cart);
+
+        if (shippingFee < 0)
+        {
+            shippingFee = 0;
+        }
+
+        finalTotal += shippingFee;
+        if (finalTotal < 0)
+        {
+            finalTotal = 0;
+        }
+
+        var resolvedDeliveryMethod = !string.IsNullOrWhiteSpace(deliveryMethod)
+            ? deliveryMethod
+            : shippingFee > 0 ? "GHN" : "Standard";
 
         // Bước 4: Tạo đơn hàng và cập nhật stock (sử dụng Unit of Work với Transaction)
         var order = await CreateOrderWithTransactionAsync(
-            cart, 
-            customerId, 
-            subtotal, 
-            discountValue, 
-            finalTotal, 
-            paymentMethod
+            cart,
+            customerId,
+            subtotal,
+            discountValue,
+            finalTotal,
+            discountStrategyName,
+            paymentMethod,
+            shippingFee,
+            resolvedDeliveryMethod
         );
 
         // Bước 5: Xử lý thanh toán thông qua Adapter Pattern (IPaymentGateway)
@@ -93,18 +117,9 @@ public class CheckoutFacade : ICheckoutFacade
     /// <summary>
     /// Bước 2: Tính giá sử dụng Strategy Pattern
     /// </summary>
-    private (decimal Subtotal, decimal DiscountValue, decimal FinalTotal) CalculatePricing(ShoppingCart cart)
+    private (decimal Subtotal, decimal DiscountValue, decimal FinalTotal, string DiscountStrategyName) CalculatePricing(ShoppingCart cart)
     {
-        // Subtotal = ∑(Quantity × UnitPrice)
-        decimal subtotal = cart.Subtotal;
-
-        // Tính discount value từ strategy
-        var (discountValue, finalTotal) = _discountService.CalculateDiscountAndTotal(
-            subtotal,
-            cart.DiscountStrategyName
-        );
-
-        return (subtotal, discountValue, finalTotal);
+        return CheckoutPricingHelper.Calculate(cart, _discountService);
     }
 
     /// <summary>
@@ -116,7 +131,10 @@ public class CheckoutFacade : ICheckoutFacade
         decimal subtotal,
         decimal discountValue,
         decimal finalTotal,
-        string? paymentMethod)
+        string discountStrategyName,
+        string? paymentMethod,
+        decimal shippingFee,
+        string deliveryMethod)
     {
         // Begin transaction để đảm bảo atomicity
         await _unitOfWork.BeginTransactionAsync();
@@ -124,15 +142,14 @@ public class CheckoutFacade : ICheckoutFacade
         try
         {
             var finalPaymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "COD" : paymentMethod!;
-            var finalDeliveryMethod = "Standard";
-            var finalDiscountStrategy = string.IsNullOrWhiteSpace(cart.DiscountStrategyName) ? "NoDiscount" : cart.DiscountStrategyName!;
+            var finalDiscountStrategy = string.IsNullOrWhiteSpace(discountStrategyName) ? "NoDiscount" : discountStrategyName;
 
             // Bước 3a: Tạo đơn hàng qua Oracle procedure
             int newOrderId = await _unitOfWork.Orders.CreateOrderHeaderViaProcedureAsync(
                 customerId,
                 finalTotal,
                 finalPaymentMethod,
-                finalDeliveryMethod,
+                deliveryMethod,
                 subtotal,
                 discountValue,
                 finalDiscountStrategy
@@ -164,6 +181,11 @@ public class CheckoutFacade : ICheckoutFacade
             {
                 throw new InvalidOperationException("Không thể tải đơn hàng vừa tạo.");
             }
+
+            newOrder.ShippingFee = shippingFee;
+            _unitOfWork.Orders.Update(newOrder);
+            await _unitOfWork.SaveChangesAsync();
+
             return newOrder;
         }
         catch

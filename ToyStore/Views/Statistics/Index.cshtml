@@ -27,7 +27,7 @@
                 <div class="col-md-3" id="yearInputGroup">
                     <label for="reportYear" class="form-label statistics-label">Năm</label>
                     <input type="number" id="reportYear" class="form-control statistics-input"
-                           min="2000" max="2100" value="@defaultYear" />
+                           min="2000" max="@DateTime.Now.Year" value="@defaultYear" />
                 </div>
                 <div class="col-md-3">
                     <button type="button" id="btnLoadReport" class="btn statistics-btn-primary w-100">
@@ -247,15 +247,18 @@
             function renderRevenueChart(labels, revenues, orders) {
                 destroyRevenueChart();
 
+                const hasAnyData = (revenues && revenues.some(v => v > 0))
+                    || (orders && orders.some(v => v > 0));
+
                 const ctx = document.getElementById('revenueChart').getContext('2d');
                 revenueChartInstance = new Chart(ctx, {
                     data: {
-                        labels: labels,
+                        labels: labels.length ? labels : ['Không có dữ liệu'],
                         datasets: [
                             {
                                 type: 'bar',
                                 label: 'Doanh thu (VNĐ)',
-                                data: revenues,
+                                data: hasAnyData ? revenues : [0],
                                 backgroundColor: 'rgba(255, 255, 255, 0.45)',
                                 borderColor: 'rgba(255, 255, 255, 0.9)',
                                 borderWidth: 1,
@@ -265,7 +268,7 @@
                             {
                                 type: 'line',
                                 label: 'Số đơn hàng',
-                                data: orders,
+                                data: hasAnyData ? orders : [0],
                                 borderColor: 'rgba(179, 179, 179, 1)',
                                 backgroundColor: 'rgba(179, 179, 179, 0.15)',
                                 borderWidth: 2,

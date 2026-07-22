@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ToyStore.Domain.Entities;
 
@@ -18,6 +19,15 @@ public partial class Order
     public string? PaymentMethod { get; set; }
 
     public string? DeliveryMethod { get; set; }
+
+    [Column("ShippingCode")]
+    public string? ShippingCode { get; set; }
+
+    [Column("ShippingFee")]
+    public decimal ShippingFee { get; set; }
+
+    [Column("ShippingAddress")]
+    public string? ShippingAddress { get; set; }
 
     /// <summary>
     /// Tên discount strategy được áp dụng (VipDiscount, SeasonalDiscount, NoDiscount)
@@ -38,6 +48,12 @@ public partial class Order
     /// Số tiền giảm theo ưu đãi hạng thẻ thành viên (xếp chồng với khuyến mãi/voucher).
     /// </summary>
     public decimal MembershipDiscountValue { get; set; } = 0;
+
+    /// <summary>
+    /// Loại đơn: Online hoặc POS (bán tại quầy).
+    /// </summary>
+    [Column("OrderType")]
+    public string? OrderType { get; set; }
 
     public virtual Customer Customer { get; set; } = null!;
 

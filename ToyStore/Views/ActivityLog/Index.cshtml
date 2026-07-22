@@ -1,0 +1,536 @@
+@model ToyStore.Models.ActivityLogIndexViewModel
+
+@{
+    ViewData["Title"] = "Lịch sử hành vi khách hàng";
+    var startIndex = (Model.CurrentPage - 1) * Model.PageSize;
+}
+
+@functions {
+    static (string Label, string BadgeClass, string Icon) GetActivityMeta(string? activityType)
+    {
+        return activityType switch
+        {
+            "ViewProduct" => ("Xem sản phẩm", "activity-badge--view", "fas fa-eye"),
+            "AddToCart" => ("Thêm vào giỏ", "activity-badge--cart", "fas fa-cart-plus"),
+            "Search" => ("Tìm kiếm", "activity-badge--search", "fas fa-search"),
+            _ => (activityType ?? "Không xác định", "activity-badge--unknown", "fas fa-question")
+        };
+    }
+}
+
+<div class="container-fluid activity-log-page">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-history me-2"></i>Lịch sử hành vi khách hàng</h2>
+            <p class="text-muted mb-0 activity-log-subtitle">
+                Theo dõi @Model.TotalCount.ToString("N0") bản ghi từ bảng UserActivityLog
+            </p>
+        </div>
+
+        <form method="get" asp-action="Index" class="activity-log-toolbar d-flex align-items-center gap-2 flex-wrap">
+            <div class="search-group">
+                <input type="text"
+                       name="searchEmail"
+                       value="@Model.SearchEmail"
+                       class="form-control search-input"
+                       placeholder="Tìm theo email khách hàng..." />
+            </div>
+            <div class="search-group">
+                <select name="activityType" class="form-select filter-select">
+                    <option value="">Tất cả hành vi</option>
+                    @if (Model.ActivityType == "ViewProduct")
+                    {
+                        <option value="ViewProduct" selected>Xem sản phẩm</option>
+                    }
+                    else
+                    {
+                        <option value="ViewProduct">Xem sản phẩm</option>
+                    }
+                    @if (Model.ActivityType == "AddToCart")
+                    {
+                        <option value="AddToCart" selected>Thêm vào giỏ</option>
+                    }
+                    else
+                    {
+                        <option value="AddToCart">Thêm vào giỏ</option>
+                    }
+                    @if (Model.ActivityType == "Search")
+                    {
+                        <option value="Search" selected>Tìm kiếm</option>
+                    }
+                    else
+                    {
+                        <option value="Search">Tìm kiếm</option>
+                    }
+                </select>
+            </div>
+            <button type="submit" class="btn btn-outline-light">
+                <i class="fas fa-filter"></i> Lọc dữ liệu
+            </button>
+            @if (Model.HasFilters)
+            {
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i> Xóa bộ lọc
+                </a>
+            }
+        </form>
+    </div>
+
+    @if (Model.Logs.Any())
+    {
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover activity-log-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 60px;"><i class="fas fa-list-ol me-2"></i>STT</th>
+                                <th><i class="fas fa-user me-2"></i>Khách hàng</th>
+                                <th style="width: 170px;"><i class="fas fa-bolt me-2"></i>Hành động</th>
+                                <th><i class="fas fa-cube me-2"></i>Sản phẩm tương tác</th>
+                                <th style="width: 190px;"><i class="fas fa-clock me-2"></i>Thời gian</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < Model.Logs.Count; i++)
+                            {
+                                var log = Model.Logs[i];
+                                var meta = GetActivityMeta(log.ActivityType);
+                                var rowNumber = startIndex + i + 1;
+
+                                <tr>
+                                    <td>
+                                        <span class="row-index">@rowNumber</span>
+                                    </td>
+                                    <td>
+                                        @if (log.Customer != null)
+                                        {
+                                            <div class="d-flex align-items-center">
+                                                <div class="avatar-circle me-2">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                                <div>
+                                                    <strong>@log.Customer.FullName</strong>
+                                                    <br />
+                                                    <small class="text-muted">@log.Customer.Email</small>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Không có thông tin</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="activity-badge @meta.BadgeClass">
+                                            <i class="@meta.Icon me-1"></i>@meta.Label
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (log.ActivityType == "Search")
+                                        {
+                                            <div class="search-keyword">
+                                                <i class="fas fa-quote-left me-2 text-muted"></i>
+                                                <span>@(string.IsNullOrWhiteSpace(log.Details) ? "(Không có từ khóa)" : log.Details)</span>
+                                            </div>
+                                        }
+                                        else if (log.Product != null)
+                                        {
+                                            <div class="d-flex align-items-center gap-2 product-cell">
+                                                @{
+                                                    var imageUrl = string.IsNullOrWhiteSpace(log.Product.ImageUrl)
+                                                        ? "/images/no-image.png"
+                                                        : log.Product.ImageUrl;
+                                                }
+                                                <img src="@imageUrl"
+                                                     alt="@log.Product.ProductName"
+                                                     class="product-thumb"
+                                                     onerror="this.src='/images/no-image.png'" />
+                                                <span class="product-name">@log.Product.ProductName</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="timestamp-text">@log.Timestamp.ToString("dd/MM/yyyy HH:mm:ss")</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="activity-pagination mt-4" aria-label="Phân trang lịch sử hành vi">
+                <ul class="pagination justify-content-center mb-0">
+                    @{
+                        var prevPage = Model.CurrentPage - 1;
+                        var nextPage = Model.CurrentPage + 1;
+                        var pageWindow = 2;
+                        var startPage = Math.Max(1, Model.CurrentPage - pageWindow);
+                        var endPage = Math.Min(Model.TotalPages, Model.CurrentPage + pageWindow);
+                    }
+
+                    <li class="page-item @(Model.CurrentPage <= 1 ? "disabled" : "")">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-page="@prevPage"
+                           asp-route-searchEmail="@Model.SearchEmail"
+                           asp-route-activityType="@Model.ActivityType"
+                           aria-label="Trang trước">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+
+                    @if (startPage > 1)
+                    {
+                        <li class="page-item">
+                            <a class="page-link"
+                               asp-action="Index"
+                               asp-route-page="1"
+                               asp-route-searchEmail="@Model.SearchEmail"
+                               asp-route-activityType="@Model.ActivityType">1</a>
+                        </li>
+                        @if (startPage > 2)
+                        {
+                            <li class="page-item disabled"><span class="page-link page-ellipsis">…</span></li>
+                        }
+                    }
+
+                    @for (var p = startPage; p <= endPage; p++)
+                    {
+                        <li class="page-item @(p == Model.CurrentPage ? "active" : "")">
+                            <a class="page-link"
+                               asp-action="Index"
+                               asp-route-page="@p"
+                               asp-route-searchEmail="@Model.SearchEmail"
+                               asp-route-activityType="@Model.ActivityType">@p</a>
+                        </li>
+                    }
+
+                    @if (endPage < Model.TotalPages)
+                    {
+                        @if (endPage < Model.TotalPages - 1)
+                        {
+                            <li class="page-item disabled"><span class="page-link page-ellipsis">…</span></li>
+                        }
+                        <li class="page-item">
+                            <a class="page-link"
+                               asp-action="Index"
+                               asp-route-page="@Model.TotalPages"
+                               asp-route-searchEmail="@Model.SearchEmail"
+                               asp-route-activityType="@Model.ActivityType">@Model.TotalPages</a>
+                        </li>
+                    }
+
+                    <li class="page-item @(Model.CurrentPage >= Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-page="@nextPage"
+                           asp-route-searchEmail="@Model.SearchEmail"
+                           asp-route-activityType="@Model.ActivityType"
+                           aria-label="Trang sau">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+                <p class="pagination-summary text-center text-muted mt-3 mb-0">
+                    Trang @Model.CurrentPage / @Model.TotalPages
+                    — hiển thị @((startIndex + 1).ToString("N0"))–@((startIndex + Model.Logs.Count).ToString("N0"))
+                    trong tổng @Model.TotalCount.ToString("N0") bản ghi
+                </p>
+            </nav>
+        }
+    }
+    else
+    {
+        <div class="text-center py-5 empty-state">
+            <i class="fas fa-history fa-4x text-muted mb-4"></i>
+            <h4 class="text-muted">Không tìm thấy bản ghi nào</h4>
+            <p class="text-muted">
+                @(Model.HasFilters
+                    ? "Thử điều chỉnh bộ lọc email hoặc loại hành vi để xem thêm kết quả."
+                    : "Chưa có dữ liệu hành vi khách hàng trong hệ thống.")
+            </p>
+            @if (Model.HasFilters)
+            {
+                <a asp-action="Index" class="btn btn-outline-light mt-2">
+                    <i class="fas fa-times"></i> Xóa bộ lọc
+                </a>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .activity-log-page h2 {
+        font-family: 'Montserrat', sans-serif;
+        color: var(--lux-white, #fff);
+        letter-spacing: 0.04em;
+    }
+
+    .activity-log-subtitle {
+        font-size: 0.9rem;
+    }
+
+    .activity-log-toolbar {
+        background: var(--lux-surface, #111);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        padding: 0.85rem 1rem;
+    }
+
+    .avatar-circle {
+        width: 35px;
+        height: 35px;
+        background: transparent;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--lux-white, #fff);
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .table th {
+        border-top: none;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        background: transparent !important;
+        color: var(--lux-white, #fff) !important;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        font-size: 0.78rem;
+    }
+
+    .table td {
+        vertical-align: middle;
+        color: var(--lux-white, #fff) !important;
+        border-color: var(--lux-line-soft, rgba(255,255,255,0.06)) !important;
+    }
+
+    .table-hover > tbody > tr:hover > td {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    .row-index {
+        font-family: 'Montserrat', sans-serif;
+        color: var(--lux-muted, #b3b3b3);
+        font-size: 0.9rem;
+    }
+
+    .card {
+        background: var(--lux-surface, #111) !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .card-body {
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .search-group {
+        position: relative;
+    }
+
+    .search-input,
+    .filter-select {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12)) !important;
+        border-radius: 0 !important;
+        color: var(--lux-white, #fff) !important;
+        padding: 0.5rem 1rem;
+        min-width: 220px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .filter-select {
+        min-width: 180px;
+        cursor: pointer;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        background-size: 14px 11px !important;
+    }
+
+    .filter-select option {
+        background-color: var(--lux-surface, #111) !important;
+        color: var(--lux-white, #fff) !important;
+    }
+
+    .search-input::placeholder {
+        color: var(--lux-faint, #808080) !important;
+    }
+
+    .search-input:focus,
+    .filter-select:focus {
+        background: transparent !important;
+        border-color: var(--lux-white, #fff) !important;
+        box-shadow: none !important;
+        outline: none;
+    }
+
+    .btn-outline-light,
+    .btn-outline-secondary {
+        background: transparent !important;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25)) !important;
+        color: var(--lux-white, #fff) !important;
+        border-radius: 0 !important;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        box-shadow: none !important;
+        transition: all 0.35s ease;
+    }
+
+    .btn-outline-light:hover,
+    .btn-outline-secondary:hover {
+        background: var(--lux-white, #fff) !important;
+        color: #000 !important;
+        border-color: var(--lux-white, #fff) !important;
+    }
+
+    .text-muted {
+        color: var(--lux-muted, #b3b3b3) !important;
+    }
+
+    .activity-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.7rem;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        border-radius: 2px;
+        white-space: nowrap;
+    }
+
+    .activity-badge--view {
+        background: rgba(59, 130, 246, 0.18);
+        border: 1px solid rgba(96, 165, 250, 0.55);
+        color: #93c5fd;
+    }
+
+    .activity-badge--cart {
+        background: rgba(249, 115, 22, 0.18);
+        border: 1px solid rgba(251, 146, 60, 0.55);
+        color: #fdba74;
+    }
+
+    .activity-badge--search {
+        background: rgba(156, 163, 175, 0.15);
+        border: 1px solid rgba(209, 213, 219, 0.35);
+        color: #d1d5db;
+    }
+
+    .activity-badge--unknown {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.2));
+        color: var(--lux-muted, #b3b3b3);
+    }
+
+    .product-thumb {
+        width: 44px;
+        height: 44px;
+        object-fit: cover;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.15));
+        flex-shrink: 0;
+        background: var(--lux-bg, #0a0a0a);
+    }
+
+    .product-name {
+        font-size: 0.92rem;
+        line-height: 1.35;
+    }
+
+    .search-keyword {
+        font-style: italic;
+        color: var(--lux-muted, #b3b3b3);
+        word-break: break-word;
+    }
+
+    .timestamp-text {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.82rem;
+        letter-spacing: 0.03em;
+        color: var(--lux-muted, #b3b3b3) !important;
+        white-space: nowrap;
+    }
+
+    .activity-pagination .pagination {
+        gap: 0.35rem;
+    }
+
+    .activity-pagination .page-item .page-link {
+        background: transparent;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.2));
+        color: var(--lux-muted, #b3b3b3);
+        border-radius: 0;
+        min-width: 2.4rem;
+        text-align: center;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.82rem;
+        letter-spacing: 0.05em;
+        transition: all 0.3s ease;
+    }
+
+    .activity-pagination .page-item.active .page-link {
+        background: var(--lux-white, #fff);
+        border-color: var(--lux-white, #fff);
+        color: #000;
+    }
+
+    .activity-pagination .page-item:not(.disabled) .page-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: var(--lux-white, #fff);
+        color: var(--lux-white, #fff);
+    }
+
+    .activity-pagination .page-item.disabled .page-link {
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    .page-ellipsis {
+        border: none !important;
+        background: transparent !important;
+    }
+
+    .pagination-summary {
+        font-size: 0.85rem;
+        letter-spacing: 0.03em;
+    }
+
+    .empty-state {
+        background: transparent;
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+        padding: 4rem 2rem !important;
+    }
+
+    .empty-state h4 {
+        color: var(--lux-white, #fff) !important;
+    }
+
+    @@media (max-width: 992px) {
+        .activity-log-toolbar {
+            width: 100%;
+        }
+
+        .search-input,
+        .filter-select {
+            min-width: 100%;
+        }
+    }
+</style>

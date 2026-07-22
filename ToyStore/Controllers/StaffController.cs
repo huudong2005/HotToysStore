@@ -96,7 +96,7 @@ namespace ToyStore.Controllers
             var staff = await _context.Admins.FindAsync(id);
             if (staff == null) return NotFound();
 
-            var model = new CreateStaffViewModel
+            var model = new EditStaffViewModel
             {
                 FullName = staff.FullName ?? "",
                 Username = staff.Username,
@@ -109,16 +109,8 @@ namespace ToyStore.Controllers
         // POST: Staff/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, CreateStaffViewModel model)
+        public async Task<IActionResult> Edit(int id, EditStaffViewModel model)
         {
-            // Khi sửa nhân viên, mật khẩu là tùy chọn: để trống nghĩa là giữ nguyên mật khẩu cũ.
-            // Vì vậy bỏ qua lỗi validation của Password/ConfirmPassword nếu admin không nhập gì.
-            if (string.IsNullOrWhiteSpace(model.Password) && string.IsNullOrWhiteSpace(model.ConfirmPassword))
-            {
-                ModelState.Remove(nameof(model.Password));
-                ModelState.Remove(nameof(model.ConfirmPassword));
-            }
-
             if (!ModelState.IsValid) return View(model);
 
             try
@@ -139,8 +131,8 @@ namespace ToyStore.Controllers
                 staff.Username = model.Username;
                 staff.Role = model.Role;
 
-                // Thay đổi Password Hash nếu Admin cấp mật khẩu mới
-                if (!string.IsNullOrEmpty(model.Password))
+                // Thay đổi Password Hash nếu Admin nhập mật khẩu mới
+                if (!string.IsNullOrWhiteSpace(model.Password))
                 {
                     staff.PasswordHash = _authService.HashPassword(model.Password);
                 }

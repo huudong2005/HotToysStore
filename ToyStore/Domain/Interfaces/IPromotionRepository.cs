@@ -14,4 +14,9 @@ public interface IPromotionRepository : IGenericRepository<Promotion>
     // Lấy danh sách mã khuyến mãi đang hoạt động: IsActive = true, còn lượt dùng (UsageLimit = 0 nghĩa là không giới hạn),
     // và còn hiệu lực theo thời gian (StartDate <= now <= EndDate).
     Task<IEnumerable<Promotion>> GetActivePromotionsAsync();
+
+    /// <summary>
+    /// Tăng số lượt đã dùng khi đơn hàng được đặt thành công với mã khuyến mãi.
+    /// </summary>
+    Task<bool> IncrementUsedCountAsync(string promotionCode);
 }

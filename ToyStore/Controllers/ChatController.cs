@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ToyStore.Domain.Interfaces;
+using ToyStore.Infrastructure.Data;
 using ToyStore.Models;
 
 namespace ToyStore.Controllers
@@ -10,10 +12,36 @@ namespace ToyStore.Controllers
     public class ChatController : Controller
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ToyStoreContext _context;
 
-        public ChatController(IUnitOfWork unitOfWork)
+        public ChatController(IUnitOfWork unitOfWork, ToyStoreContext context)
         {
             _unitOfWork = unitOfWork;
+            _context = context;
+        }
+
+        // GET: /Chat/CheckLiveSession — Kiểm tra phiên live chat (public cho khách hàng)
+        [HttpGet]
+        public async Task<IActionResult> CheckLiveSession(int sessionId)
+        {
+            if (sessionId <= 0)
+            {
+                return Json(new { exists = false });
+            }
+
+            try
+            {
+                var exists = await _context.ChatSessions
+                    .AsNoTracking()
+                    .AnyAsync(s => s.SessionId == sessionId
+                        && (s.Status == "Pending" || s.Status == "Active"));
+
+                return Json(new { exists });
+            }
+            catch
+            {
+                return Json(new { exists = false });
+            }
         }
 
         // POST: /Chat/SendMessage

@@ -1,10 +1,12 @@
 using System.Data;
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using Oracle.ManagedDataAccess.Client;
 using ToyStore.Domain.Interfaces;
 using ToyStore.Helpers;
+using ToyStore.Hubs;
 using ToyStore.Models;
 using ToyStore.Services;
 
@@ -18,7 +20,10 @@ public class PaymentController : Controller
     private readonly IGuestCheckoutService _guestCheckoutService;
     private readonly ICartStorageService _cartStorage;
     private readonly DiscountService _discountService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly GhnOrderShippingService _ghnOrderShippingService;
     private readonly ILogger<PaymentController> _logger;
+    private readonly IHubContext<SupportHub> _hubContext;
 
     public PaymentController(
         IConfiguration configuration,
@@ -27,7 +32,10 @@ public class PaymentController : Controller
         IGuestCheckoutService guestCheckoutService,
         ICartStorageService cartStorage,
         DiscountService discountService,
-        ILogger<PaymentController> logger)
+        IUnitOfWork unitOfWork,
+        GhnOrderShippingService ghnOrderShippingService,
+        ILogger<PaymentController> logger,
+        IHubContext<SupportHub> hubContext)
     {
         _configuration = configuration;
         _vnPaySettings = vnPaySettings.Value;
@@ -35,7 +43,10 @@ public class PaymentController : Controller
         _guestCheckoutService = guestCheckoutService;
         _cartStorage = cartStorage;
         _discountService = discountService;
+        _unitOfWork = unitOfWork;
+        _ghnOrderShippingService = ghnOrderShippingService;
         _logger = logger;
+        _hubContext = hubContext;
     }
 
     /// <summary>
@@ -55,31 +66,66 @@ public class PaymentController : Controller
                 return RedirectToAction("Checkout", "Cart");
             }
 
-            var cart = await _cartStorage.GetCartAsync(HttpContext);
-            if (!cart.Items.Any())
+            var fullCart = await _cartStorage.GetCartAsync(HttpContext);
+            if (!fullCart.Items.Any())
             {
                 TempData["ErrorMessage"] = "Giỏ hàng trống, không thể thanh toán.";
                 return RedirectToAction("Index", "Cart");
             }
 
-            var subtotal = cart.Subtotal;
-            var (discountValue, finalTotal) = _discountService.CalculateDiscountAndTotal(
-                subtotal,
-                cart.DiscountStrategyName);
+            fullCart.EnsureCartItemIds();
+            var selectedIds = CartSelectionHelper.GetSelectedIds(HttpContext);
+            if (!selectedIds.Any())
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn ít nhất 1 sản phẩm.";
+                return RedirectToAction("Index", "Cart");
+            }
 
-            var discountStrategy = string.IsNullOrWhiteSpace(cart.DiscountStrategyName)
-                ? "NoDiscount"
-                : cart.DiscountStrategyName!;
+            var cart = fullCart.CreateSubset(selectedIds);
+            if (!cart.Items.Any())
+            {
+                TempData["ErrorMessage"] = "Không tìm thấy sản phẩm đã chọn trong giỏ hàng.";
+                return RedirectToAction("Index", "Cart");
+            }
+
+            PromoSessionHelper.ApplySessionPromoToCart(HttpContext, cart);
+            PromoSessionHelper.CapDiscountToSubtotal(cart, HttpContext);
+
+            var (subtotal, discountValue, finalTotal, discountStrategy) =
+                CheckoutPricingHelper.Calculate(cart, _discountService);
+
+            var ghnDraft = PendingGhnCheckoutSession.GetDraft(HttpContext);
+            var shippingFee = ghnDraft?.ShippingFee ?? 0;
+            if (shippingFee < 0)
+            {
+                shippingFee = 0;
+            }
+
+            finalTotal += shippingFee;
+            var membershipDiscount = await CalculateMembershipDiscountAsync(customerId, subtotal);
+            finalTotal -= membershipDiscount;
+            if (finalTotal < 0)
+            {
+                finalTotal = 0;
+            }
+
+            var deliveryMethod = ghnDraft?.GhnDistrictId is > 0 ? "GHN" : "Standard";
 
             var orderId = await CreateOrderWithDetailsViaOracleAsync(
                 customerId,
                 finalTotal,
                 "VNPAY",
-                "Standard",
+                deliveryMethod,
                 subtotal,
                 discountValue,
                 discountStrategy,
                 cart);
+
+            await FinalizeVnpayOrderAsync(orderId, customerId, ghnDraft, shippingFee, membershipDiscount);
+
+            PendingGhnCheckoutSession.BindDraftToOrder(HttpContext, orderId);
+
+            await PromoSessionHelper.RecordPromoUsageAsync(_unitOfWork, cart);
 
             if (!_sessionService.IsCustomer(HttpContext))
             {
@@ -134,7 +180,10 @@ public class PaymentController : Controller
             if (int.TryParse(txnRef, out var orderId))
             {
                 var customerId = _sessionService.GetUserId(HttpContext);
-                await _cartStorage.ClearCartAfterOrderAsync(HttpContext, customerId);
+                var selectedIds = CartSelectionHelper.GetSelectedIds(HttpContext);
+                var guestCheckout = GuestOrderSession.GetGuestCheckout(HttpContext);
+                await _cartStorage.RemoveItemsAsync(HttpContext, selectedIds, customerId);
+                PromoSessionHelper.ClearSessionPromo(HttpContext);
 
                 if (!_sessionService.IsCustomer(HttpContext))
                 {
@@ -150,6 +199,47 @@ public class PaymentController : Controller
                 {
                     _logger.LogWarning(ex, "PaymentCallback: could not update order #{OrderId} status", orderId);
                 }
+
+                var order = await _unitOfWork.Orders.GetOrderWithDetailsAsync(orderId);
+                var ghnData = PendingGhnCheckoutSession.GetForOrder(HttpContext, orderId);
+                string? shippingCode = order?.ShippingCode;
+
+                if (order != null && ghnData?.GhnDistrictId is > 0 && string.IsNullOrWhiteSpace(shippingCode))
+                {
+                    try
+                    {
+                        shippingCode = await _ghnOrderShippingService.CreateShippingOrderAsync(
+                            order,
+                            order.Customer,
+                            ghnData,
+                            guestCheckout?.FullName,
+                            guestCheckout?.Phone,
+                            guestCheckout?.Address);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "PaymentCallback: GHN sync failed for VNPAY order #{OrderId}", orderId);
+                        TempData["GhnError"] =
+                            "Đơn hàng đã được ghi nhận trên hệ thống nhưng chưa thể đồng bộ sang Giao Hàng Nhanh vì: "
+                            + ex.Message;
+                    }
+                }
+
+                PendingGhnCheckoutSession.ClearForOrder(HttpContext, orderId);
+
+                TempData["SuccessMessage"] =
+                    $"Thanh toán VNPAY thành công! Mã đơn hàng: #{orderId}";
+                if (!string.IsNullOrWhiteSpace(shippingCode))
+                {
+                    TempData["GhnShippingCode"] = shippingCode;
+                }
+
+                if (_sessionService.IsCustomer(HttpContext))
+                {
+                    return RedirectToAction("Details", "Order", new { id = orderId });
+                }
+
+                return RedirectToAction("Confirmation", "Order", new { id = orderId });
             }
         }
 
@@ -256,31 +346,66 @@ public class PaymentController : Controller
                 return RedirectToAction("Checkout", "Cart");
             }
 
-            var cart = await _cartStorage.GetCartAsync(HttpContext);
-            if (!cart.Items.Any())
+            var fullCart = await _cartStorage.GetCartAsync(HttpContext);
+            if (!fullCart.Items.Any())
             {
                 TempData["ErrorMessage"] = "Giỏ hàng trống, không thể thanh toán.";
                 return RedirectToAction("Index", "Cart");
             }
 
-            var subtotal = cart.Subtotal;
-            var (discountValue, finalTotal) = _discountService.CalculateDiscountAndTotal(
-                subtotal,
-                cart.DiscountStrategyName);
+            fullCart.EnsureCartItemIds();
+            var selectedIds = CartSelectionHelper.GetSelectedIds(HttpContext);
+            if (!selectedIds.Any())
+            {
+                TempData["ErrorMessage"] = "Vui lòng chọn ít nhất 1 sản phẩm.";
+                return RedirectToAction("Index", "Cart");
+            }
 
-            var discountStrategy = string.IsNullOrWhiteSpace(cart.DiscountStrategyName)
-                ? "NoDiscount"
-                : cart.DiscountStrategyName!;
+            var cart = fullCart.CreateSubset(selectedIds);
+            if (!cart.Items.Any())
+            {
+                TempData["ErrorMessage"] = "Không tìm thấy sản phẩm đã chọn trong giỏ hàng.";
+                return RedirectToAction("Index", "Cart");
+            }
+
+            PromoSessionHelper.ApplySessionPromoToCart(HttpContext, cart);
+            PromoSessionHelper.CapDiscountToSubtotal(cart, HttpContext);
+
+            var (subtotal, discountValue, finalTotal, discountStrategy) =
+                CheckoutPricingHelper.Calculate(cart, _discountService);
+
+            var ghnDraft = PendingGhnCheckoutSession.GetDraft(HttpContext);
+            var shippingFee = ghnDraft?.ShippingFee ?? 0;
+            if (shippingFee < 0)
+            {
+                shippingFee = 0;
+            }
+
+            finalTotal += shippingFee;
+            var membershipDiscount = await CalculateMembershipDiscountAsync(customerId, subtotal);
+            finalTotal -= membershipDiscount;
+            if (finalTotal < 0)
+            {
+                finalTotal = 0;
+            }
+
+            var deliveryMethod = ghnDraft?.GhnDistrictId is > 0 ? "GHN" : "Standard";
 
             var orderId = await CreateOrderWithDetailsViaOracleAsync(
                 customerId,
                 finalTotal,
                 "VNPAY",
-                "Standard",
+                deliveryMethod,
                 subtotal,
                 discountValue,
                 discountStrategy,
                 cart);
+
+            await FinalizeVnpayOrderAsync(orderId, customerId, ghnDraft, shippingFee, membershipDiscount);
+
+            PendingGhnCheckoutSession.BindDraftToOrder(HttpContext, orderId);
+
+            await PromoSessionHelper.RecordPromoUsageAsync(_unitOfWork, cart);
 
             if (!_sessionService.IsCustomer(HttpContext))
             {
@@ -402,6 +527,13 @@ public class PaymentController : Controller
             }
 
             await transaction.CommitAsync();
+
+            await _hubContext.Clients.Group("Admins").SendAsync(
+                "ReceiveAdminNotification",
+                "Đơn hàng mới",
+                $"Đơn hàng #{orderId} vừa được đặt thành công!",
+                "/Orders");
+
             return orderId;
         }
         catch
@@ -537,6 +669,76 @@ public class PaymentController : Controller
         }
 
         return "127.0.0.1";
+    }
+
+    private async Task<decimal> CalculateMembershipDiscountAsync(int customerId, decimal subtotal)
+    {
+        if (!_sessionService.IsCustomer(HttpContext) || customerId <= 0)
+        {
+            return 0m;
+        }
+
+        var customer = await _unitOfWork.Customers.GetCustomerWithTierAsync(customerId);
+        if (customer?.Tier == null || customer.Tier.DiscountPercent <= 0)
+        {
+            return 0m;
+        }
+
+        var membershipDiscount = subtotal * (customer.Tier.DiscountPercent / 100m);
+        if (membershipDiscount < 0)
+        {
+            return 0m;
+        }
+
+        return membershipDiscount;
+    }
+
+    private async Task FinalizeVnpayOrderAsync(
+        int orderId,
+        int customerId,
+        PendingGhnCheckoutData? ghnDraft,
+        decimal shippingFee,
+        decimal membershipDiscount)
+    {
+        var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+        if (order == null)
+        {
+            return;
+        }
+
+        order.ShippingFee = shippingFee;
+        if (ghnDraft?.GhnDistrictId is > 0)
+        {
+            order.DeliveryMethod = "GHN";
+        }
+
+        if (membershipDiscount > 0)
+        {
+            if (membershipDiscount > order.TotalAmount)
+            {
+                membershipDiscount = order.TotalAmount;
+            }
+
+            order.MembershipDiscountValue = membershipDiscount;
+        }
+
+        if (ghnDraft != null)
+        {
+            var address = await _ghnOrderShippingService.ResolveGhnShippingAddressAsync(
+                ghnDraft.ShippingAddress,
+                ghnDraft.DeliveryStreet,
+                ghnDraft.GhnProvinceId,
+                ghnDraft.GhnDistrictId,
+                ghnDraft.GhnWardCode);
+
+            if (!string.IsNullOrWhiteSpace(address))
+            {
+                order.ShippingAddress = address;
+            }
+        }
+
+        _unitOfWork.Orders.Update(order);
+        await _unitOfWork.SaveChangesAsync();
     }
 
     private async Task<int> ResolveCustomerIdForPaymentAsync()

@@ -1,0 +1,177 @@
+@model IEnumerable<ToyStore.Domain.Entities.WorkShift>
+@using ToyStore.Helpers
+@{
+    ViewData["Title"] = "Quản lý ca làm việc";
+    var month = (int)ViewBag.Month;
+    var year = (int)ViewBag.Year;
+    var statusFilter = ViewBag.Status as string;
+    var statusOptions = ViewBag.StatusOptions as string[] ?? HrConstants.AttendanceStatuses;
+    var staffList = ViewBag.StaffList as Microsoft.AspNetCore.Mvc.Rendering.SelectList;
+}
+
+@await Html.PartialAsync("_HrDarkThemeStyles")
+
+<div class="container-fluid hr-page py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <h2 class="hr-page-title mb-0">
+            <i class="fas fa-calendar-alt me-2"></i> Quản lý ca làm việc
+        </h2>
+        <a asp-action="Create" class="btn hr-btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i> Phân ca mới
+        </a>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert hr-alert hr-alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert hr-alert hr-alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card hr-ghost-card mb-4">
+        <div class="card-body">
+            <form method="get" asp-action="Index" class="hr-filter-form row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="hr-label">Nhân viên</label>
+                    <select name="adminId" asp-items="staffList" class="form-select">
+                        <option value="">-- Tất cả --</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="hr-label">Tháng</label>
+                    <select name="month" class="form-select">
+                        @for (var m = 1; m <= 12; m++)
+                        {
+                            <option value="@m" selected="@(month == m)">Tháng @m</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="hr-label">Năm</label>
+                    <select name="year" class="form-select">
+                        @foreach (var y in Enumerable.Range(DateTime.Now.Year - 1, 4))
+                        {
+                            <option value="@y" selected="@(year == y)">@y</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="hr-label">Trạng thái</label>
+                    <select name="status" class="form-select">
+                        <option value="">-- Tất cả --</option>
+                        @foreach (var s in statusOptions)
+                        {
+                            <option value="@s" selected="@(statusFilter == s)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn hr-btn-outline btn-sm w-100">
+                        <i class="fas fa-filter me-1"></i> Lọc
+                    </button>
+                    <a asp-action="Index" class="btn hr-btn-outline btn-sm">Xóa</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card hr-table-card">
+        <div class="card-header hr-table-header py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-table me-2"></i> Danh sách ca — Tháng @month/@year
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table hr-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Mã ca</th>
+                                <th>Nhân viên</th>
+                                <th>Ngày</th>
+                                <th>Ca</th>
+                                <th>Trạng thái</th>
+                                <th>Chấm công</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var shift in Model)
+                            {
+                                var badgeClass = shift.Status switch
+                                {
+                                    HrConstants.StatusCompleted => "hr-badge--completed",
+                                    HrConstants.StatusAbsent => "hr-badge--absent",
+                                    _ => "hr-badge--pending"
+                                };
+
+                                <tr>
+                                    <td><span class="badge hr-badge">#@shift.ShiftId</span></td>
+                                    <td>
+                                        <strong>@(shift.Admin?.FullName ?? "—")</strong>
+                                        <div class="text-muted small">@(shift.Admin?.Username)</div>
+                                    </td>
+                                    <td>@shift.WorkDate.ToString("dd/MM/yyyy")</td>
+                                    <td>@shift.ShiftName</td>
+                                    <td><span class="badge hr-badge @badgeClass">@shift.Status</span></td>
+                                    <td>
+                                        @if (shift.Status == HrConstants.StatusPending)
+                                        {
+                                            <div class="hr-attendance-form">
+                                                <form asp-action="UpdateStatus" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="shiftId" value="@shift.ShiftId" />
+                                                    <input type="hidden" name="status" value="@HrConstants.StatusCompleted" />
+                                                    <input type="hidden" name="month" value="@month" />
+                                                    <input type="hidden" name="year" value="@year" />
+                                                    <input type="hidden" name="adminId" value="@ViewContext.HttpContext.Request.Query["adminId"]" />
+                                                    <input type="hidden" name="filterStatus" value="@statusFilter" />
+                                                    <button type="submit" class="btn hr-btn-success btn-sm" title="Đã hoàn thành">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                                <form asp-action="UpdateStatus" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="shiftId" value="@shift.ShiftId" />
+                                                    <input type="hidden" name="status" value="@HrConstants.StatusAbsent" />
+                                                    <input type="hidden" name="month" value="@month" />
+                                                    <input type="hidden" name="year" value="@year" />
+                                                    <input type="hidden" name="adminId" value="@ViewContext.HttpContext.Request.Query["adminId"]" />
+                                                    <input type="hidden" name="filterStatus" value="@statusFilter" />
+                                                    <button type="submit" class="btn hr-btn-warning btn-sm" title="Vắng mặt">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">Đã chốt</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                    <p class="text-muted mb-3">Không có ca làm việc trong kỳ đã chọn.</p>
+                    <a asp-action="Create" class="btn hr-btn-primary btn-sm">Phân ca mới</a>
+                </div>
+            }
+        </div>
+    </div>
+</div>

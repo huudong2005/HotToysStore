@@ -3,7 +3,7 @@ using ToyStore.Models;
 namespace ToyStore.Domain.Interfaces;
 
 /// <summary>
-/// Truy vấn thống kê doanh thu qua Stored Procedure Oracle (SYS_REFCURSOR).
+/// Truy vấn thống kê doanh thu qua EF Core (Oracle).
 /// </summary>
 public interface IStatisticsRepository
 {

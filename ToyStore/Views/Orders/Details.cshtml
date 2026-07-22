@@ -16,6 +16,7 @@
 
     var badge = StatusBadge(Model.Status);
     var itemCount = Model.OrderDetails?.Sum(d => d.Quantity) ?? 0;
+    var shippingAddress = Model.ShippingAddress;
 }
 
 <div class="order-details">
@@ -53,8 +54,8 @@
                         <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.Customer?.Phone) ? "—" : Model.Customer!.Phone)</span>
                     </div>
                     <div class="od-info">
-                        <span class="od-info__label">Địa chỉ</span>
-                        <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.Customer?.Address) ? "—" : Model.Customer!.Address)</span>
+                        <span class="od-info__label">Địa chỉ giao hàng</span>
+                        <span class="od-info__value">@(string.IsNullOrWhiteSpace(shippingAddress) ? "—" : shippingAddress)</span>
                     </div>
                 </div>
             </div>
@@ -66,6 +67,20 @@
                         <span class="od-info__label">Phương thức giao</span>
                         <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.DeliveryMethod) ? "—" : Model.DeliveryMethod)</span>
                     </div>
+                    @if (!string.IsNullOrWhiteSpace(Model.ShippingCode))
+                    {
+                        <div class="od-info">
+                            <span class="od-info__label">Mã vận đơn GHN</span>
+                            <span class="od-info__value">@Model.ShippingCode</span>
+                        </div>
+                    }
+                    @if (Model.ShippingFee > 0)
+                    {
+                        <div class="od-info">
+                            <span class="od-info__label">Phí vận chuyển</span>
+                            <span class="od-info__value">@Model.ShippingFee.ToString("#,##0") ₫</span>
+                        </div>
+                    }
                     <div class="od-info">
                         <span class="od-info__label">Thanh toán</span>
                         <span class="od-info__value">@(string.IsNullOrWhiteSpace(Model.PaymentMethod) ? "—" : Model.PaymentMethod)</span>

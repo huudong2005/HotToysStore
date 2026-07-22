@@ -1086,6 +1086,169 @@ textarea:focus {
     color: var(--lux-black);
 }
 
+.chat-live-support-bar {
+    padding: 0.65rem 1rem 0;
+    border-top: 1px dashed var(--lux-line, rgba(255,255,255,0.12));
+}
+
+.btn-request-support {
+    width: 100%;
+    background: transparent !important;
+    border: 1px dashed var(--lux-line, rgba(255,255,255,0.25)) !important;
+    color: var(--lux-white, #fff) !important;
+    border-radius: 0 !important;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.55rem 0.75rem;
+    transition: all 0.35s ease;
+}
+
+.btn-request-support:hover:not(:disabled),
+.btn-request-support:focus:not(:disabled) {
+    background: var(--lux-white, #fff) !important;
+    color: var(--lux-black, #000) !important;
+    border-color: var(--lux-white, #fff) !important;
+    box-shadow: none !important;
+}
+
+.btn-request-support:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.btn-disconnect-support {
+    width: 100%;
+    background: transparent !important;
+    border: 1px dashed rgba(255, 120, 120, 0.45) !important;
+    color: #ffb4b4 !important;
+    border-radius: 0 !important;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.55rem 0.75rem;
+    transition: all 0.35s ease;
+}
+
+.btn-disconnect-support:hover:not(:disabled),
+.btn-disconnect-support:focus:not(:disabled) {
+    background: rgba(255, 120, 120, 0.12) !important;
+    color: #ffd0d0 !important;
+    border-color: rgba(255, 120, 120, 0.7) !important;
+    box-shadow: none !important;
+}
+
+.btn-disconnect-support:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.chat-live-support-bar .btn-disconnect-support {
+    margin-top: 0.5rem;
+}
+
+/* ===== Admin Real-time Notifications ===== */
+.admin-notify-nav {
+    display: flex;
+    align-items: center;
+}
+
+.admin-notify-bell {
+    position: relative;
+    background: transparent !important;
+    border: none !important;
+    color: var(--lux-white, #fff) !important;
+    padding: 0.5rem 0.75rem !important;
+    cursor: pointer;
+    transition: color var(--lux-ease, 0.35s ease);
+}
+
+.admin-notify-bell:hover,
+.admin-notify-bell:focus {
+    color: var(--lux-muted, #b3b3b3) !important;
+}
+
+.admin-notify-badge {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #e04545;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+    border: 1px solid var(--lux-black, #000);
+}
+
+.admin-toast-container {
+    z-index: 1090;
+    pointer-events: none;
+}
+
+.admin-toast-container .toast {
+    pointer-events: auto;
+}
+
+.admin-toast {
+    background: var(--lux-surface, #111) !important;
+    border: 1px dashed var(--lux-line, rgba(255,255,255,0.2)) !important;
+    border-radius: 0 !important;
+    color: var(--lux-white, #fff) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    min-width: 320px;
+    max-width: min(380px, calc(100vw - 2rem));
+}
+
+.admin-toast__header {
+    background: var(--lux-black, #000) !important;
+    border-bottom: 1px dashed var(--lux-line, rgba(255,255,255,0.15)) !important;
+    color: var(--lux-white, #fff) !important;
+}
+
+.admin-toast__icon {
+    color: #ffd27a;
+}
+
+.admin-toast__title {
+    font-family: var(--font-display, 'Montserrat', sans-serif);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+}
+
+.admin-toast__time {
+    color: var(--lux-muted, #b3b3b3) !important;
+    font-size: 0.68rem;
+}
+
+.admin-toast__body {
+    background: var(--lux-surface, #111) !important;
+    color: var(--lux-muted, #b3b3b3) !important;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.admin-toast__link {
+    color: var(--lux-white, #fff);
+    text-decoration: none;
+    display: block;
+}
+
+.admin-toast__link:hover {
+    color: #fff;
+    text-decoration: underline;
+}
+
 @media (max-width: 480px) {
     .chat-window {
         width: calc(100vw - 30px);

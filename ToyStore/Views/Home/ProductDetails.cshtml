@@ -2,26 +2,69 @@
 @{
     ViewData["Title"] = "Chi tiết sản phẩm";
     var user = ViewBag.User as ToyStore.Models.UserSession;
+
+    var galleryItems = new List<(string Url, string Alt)>();
+    if (!string.IsNullOrEmpty(Model.ImageUrl))
+    {
+        galleryItems.Add((Model.ImageUrl, Model.ProductName));
+    }
+
+    if (Model.ProductImages != null)
+    {
+        foreach (var image in Model.ProductImages.OrderBy(pi => pi.DisplayOrder))
+        {
+            if (!string.IsNullOrEmpty(image.ImageUrl) &&
+                !galleryItems.Any(g => g.Url == image.ImageUrl))
+            {
+                galleryItems.Add((image.ImageUrl, Model.ProductName));
+            }
+        }
+    }
+
+    var initialImageUrl = galleryItems.FirstOrDefault().Url;
 }
 
-<link rel="stylesheet" href="~/css/product-details.css?v=1" />
+<link rel="stylesheet" href="~/css/product-details.css?v=3" />
 
 <div class="container mt-4 pb-5">
     <div class="row">
         <!-- Hình ảnh sản phẩm -->
         <div class="col-md-6">
-            <div class="product-image-container">
-                @if (!string.IsNullOrEmpty(Model.ImageUrl))
-                {
-                    <img src="@Model.ImageUrl" class="img-fluid rounded product-image" alt="@Model.ProductName" style="max-height: 500px; width: 100%; object-fit: cover;">
-                }
-                else
-                {
+            @if (galleryItems.Count > 0)
+            {
+                <div class="product-gallery">
+                    @if (galleryItems.Count > 1)
+                    {
+                        <div class="product-gallery-thumbs">
+                            @for (var i = 0; i < galleryItems.Count; i++)
+                            {
+                                var item = galleryItems[i];
+                                <button type="button"
+                                        class="product-gallery-thumb @(i == 0 ? "is-active" : "")"
+                                        data-image="@item.Url"
+                                        aria-label="Xem ảnh @(i + 1)">
+                                    <img src="@item.Url" alt="@item.Alt" />
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    <div class="product-gallery-main product-image-container d-flex justify-content-center align-items-center">
+                        <img id="mainProductImage"
+                             src="@initialImageUrl"
+                             class="img-fluid rounded product-image"
+                             alt="@Model.ProductName">
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="product-image-container d-flex justify-content-center align-items-center">
                     <div class="bg-dark d-flex align-items-center justify-content-center rounded product-image-placeholder">
                         <i class="fas fa-image fa-5x text-muted"></i>
                     </div>
-                }
-            </div>
+                </div>
+            }
         </div>
 
         <!-- Thông tin sản phẩm -->
@@ -162,6 +205,44 @@
         </div>
     </div>
 
+    @{
+        var recommendedProducts = ViewBag.RecommendedProducts as IEnumerable<ToyStore.Domain.Entities.Product>;
+    }
+    @if (recommendedProducts != null && recommendedProducts.Any())
+    {
+        <section class="product-recommendations mt-5 pt-5">
+            <h3 class="product-recommendations__title mb-4">
+                <i class="fas fa-sparkles me-2"></i>SẢN PHẨM CÓ THỂ BẠN QUAN TÂM
+            </h3>
+            <div class="row g-4">
+                @foreach (var item in recommendedProducts)
+                {
+                    <div class="col-6 col-md-3">
+                        <a asp-controller="Home" asp-action="ProductDetails" asp-route-id="@item.ProductId"
+                           class="product-recommend-card text-decoration-none">
+                            <div class="product-recommend-card__image-wrap">
+                                @if (!string.IsNullOrEmpty(item.ImageUrl))
+                                {
+                                    <img src="@item.ImageUrl" alt="@item.ProductName" class="product-recommend-card__image" />
+                                }
+                                else
+                                {
+                                    <div class="product-recommend-card__placeholder">
+                                        <i class="fas fa-image"></i>
+                                    </div>
+                                }
+                            </div>
+                            <div class="product-recommend-card__body">
+                                <h6 class="product-recommend-card__name">@item.ProductName</h6>
+                                <p class="product-recommend-card__price mb-0">@item.Price.ToString("N0") ₫</p>
+                            </div>
+                        </a>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
     <!-- Nút quay lại -->
     <div class="row mt-5 pt-4 border-top border-neon">
         <div class="col-12">
@@ -174,3 +255,25 @@
         </div>
     </div>
 </div>
+
+@if (galleryItems.Count > 1)
+{
+    <script>
+        (function () {
+            var mainImage = document.getElementById('mainProductImage');
+            var thumbs = document.querySelectorAll('.product-gallery-thumb');
+            if (!mainImage || !thumbs.length) return;
+
+            thumbs.forEach(function (thumb) {
+                thumb.addEventListener('click', function () {
+                    var nextSrc = this.getAttribute('data-image');
+                    if (!nextSrc) return;
+
+                    mainImage.src = nextSrc;
+                    thumbs.forEach(function (t) { t.classList.remove('is-active'); });
+                    this.classList.add('is-active');
+                });
+            });
+        })();
+    </script>
+}

@@ -1,62 +1,60 @@
 @model ToyStore.Domain.Entities.Customer
 
 @{
-    ViewData["Title"] = "Delete";
+    ViewData["Title"] = "Xác nhận xóa khách hàng";
 }
 
-<div class="crud-theme">
+<div class="crud-theme mt-5">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="mb-0"><i class="fas fa-user-times me-2"></i>Xác nhận xóa khách hàng</h4>
+        <div class="col-md-6 col-lg-5">
+            <div class="card revenue-ghost-card" style="border-color: rgba(220, 53, 69, 0.5);">
+                <div class="card-header text-center pt-4 pb-2" style="border-bottom: none; background: transparent;">
+                    <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                    <h4 class="mb-0 text-white" style="font-family: 'Montserrat', sans-serif; letter-spacing: 0.1em; text-transform: uppercase;">
+                        Cảnh báo xóa dữ liệu
+                    </h4>
                 </div>
-                <div class="card-body">
-                    <div class="alert alert-warning">Bạn có chắc chắn muốn xóa khách hàng này?</div>
-                    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.FullName)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.FullName)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Email)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Email)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Phone)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Phone)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Address)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Address)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.PasswordHash)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.PasswordHash)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.CreatedAt)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.CreatedAt)
-        </dd>
-                    </dl>
-                    
-                    <form asp-action="Delete" class="d-inline">
-                        <input type="hidden" asp-for="CustomerId" />
-                        <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Xóa</button>
-                    </form>
-                    <a asp-action="Index" class="btn btn-secondary ms-2">Quay lại</a>
+                <div class="card-body p-4 text-center">
+                    <p class="text-light mb-4">
+                        Bạn có chắc chắn muốn xóa vĩnh viễn khách hàng <strong class="text-danger">@Model.FullName</strong>?<br />
+                        <span class="text-muted small">Hành động này không thể hoàn tác và có thể ảnh hưởng đến dữ liệu đơn hàng liên quan.</span>
+                    </p>
+
+                    <div class="customer-info-box text-start p-4 mb-4 mx-auto" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); max-width: 400px;">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Họ và tên</span>
+                            <span class="text-white fw-bold">@Model.FullName</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Email</span>
+                            <span class="text-white">@Model.Email</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Số điện thoại</span>
+                            <span class="text-white">@Model.Phone</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Địa chỉ</span>
+                            <span class="text-white text-end" style="max-width: 60%;">@Model.Address</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted" style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Ngày đăng ký</span>
+                            <span class="text-white">@Model.CreatedAt?.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-center gap-3">
+                        <a asp-action="Index" class="btn btn-outline-secondary px-4 py-2" style="font-family: 'Montserrat', sans-serif; letter-spacing: 0.05em;">
+                            HỦY BỎ
+                        </a>
+                        <form asp-action="Delete" asp-route-id="@Model.CustomerId" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" asp-for="CustomerId" />
+                            <button type="submit" class="btn btn-danger px-4 py-2" style="font-family: 'Montserrat', sans-serif; letter-spacing: 0.05em;">
+                                <i class="fas fa-trash me-2"></i> XÓA KHÁCH HÀNG
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

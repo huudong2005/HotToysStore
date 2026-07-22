@@ -1,0 +1,67 @@
+@model ToyStore.Models.CreateWorkShiftViewModel
+@using ToyStore.Helpers
+@{
+    ViewData["Title"] = "Phân ca làm việc";
+    var staffList = ViewBag.StaffList as Microsoft.AspNetCore.Mvc.Rendering.SelectList;
+    var shiftNames = ViewBag.ShiftNames as string[] ?? HrConstants.ShiftNames;
+}
+
+@await Html.PartialAsync("_HrDarkThemeStyles")
+
+<div class="container-fluid hr-page py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="hr-page-title mb-0">
+            <i class="fas fa-user-clock me-2"></i> Phân ca làm việc
+        </h2>
+        <a asp-action="Index" class="btn hr-btn-outline btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Quay lại
+        </a>
+    </div>
+
+    <div class="card hr-ghost-card">
+        <div class="card-body p-4">
+            <form asp-action="Create" method="post" class="hr-filter-form">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label asp-for="AdminId" class="hr-label"></label>
+                        <select asp-for="AdminId" asp-items="staffList" class="form-select">
+                            <option value="">-- Chọn nhân viên --</option>
+                        </select>
+                        <span asp-validation-for="AdminId" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label asp-for="WorkDate" class="hr-label"></label>
+                        <input asp-for="WorkDate" class="form-control" type="date" />
+                        <span asp-validation-for="WorkDate" class="text-danger small"></span>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label asp-for="ShiftName" class="hr-label"></label>
+                        <select asp-for="ShiftName" class="form-select">
+                            @foreach (var shift in shiftNames)
+                            {
+                                <option value="@shift">@shift</option>
+                            }
+                        </select>
+                        <span asp-validation-for="ShiftName" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn hr-btn-primary btn-sm">
+                        <i class="fas fa-save me-1"></i> Lưu ca
+                    </button>
+                    <a asp-action="Index" class="btn hr-btn-outline btn-sm">Hủy</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -71,7 +71,15 @@ public class CustomerCartPersistenceService : ICustomerCartPersistenceService
                 continue;
             }
 
-            cart.AddItem(cartItem.Product, cartItem.Quantity);
+            cart.Items.Add(new ShoppingCartItem
+            {
+                CartItemId = cartItem.CartItemId,
+                ProductId = cartItem.ProductId,
+                ProductName = cartItem.Product.ProductName,
+                Price = cartItem.Product.Price,
+                Quantity = cartItem.Quantity,
+                ImageUrl = cartItem.Product.ImageUrl
+            });
         }
 
         return cart;

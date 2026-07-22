@@ -2,6 +2,8 @@
 
 @{
     ViewData["Title"] = "Quản lý đơn hàng";
+    var successMessage = TempData["SuccessMessage"] as string;
+    var errorMessage = TempData["ErrorMessage"] as string;
 }
 
 @functions {
@@ -52,21 +54,23 @@
         </div>
     </div>
 
-    @if (TempData["SuccessMessage"] != null)
+    @if (!string.IsNullOrEmpty(successMessage))
     {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            @TempData["SuccessMessage"]
+        <div id="order-status-alert" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@successMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
 
-    @if (TempData["ErrorMessage"] != null)
+    @if (!string.IsNullOrEmpty(errorMessage))
     {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @TempData["ErrorMessage"]
+        <div id="order-status-alert" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>@errorMessage
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     }
+
+    <div id="order-toast-container" class="order-toast-container" aria-live="polite" aria-atomic="true"></div>
 
     @if (Model.Any())
     {
@@ -91,7 +95,7 @@
                                 var currentStatus = NormalizeStatus(item.Status);
                                 bool isLocked = currentStatus == "Hoàn thành" || currentStatus == "Đã hủy";
                                 var statusOptions = new[] { "Chờ xác nhận", "Đã xác nhận", "Đang giao hàng", "Hoàn thành", "Đã hủy" };
-                                <tr>
+                                <tr data-order-id="@item.OrderId">
                                     <td>
                                         <span class="badge bg-primary fs-6">#@item.OrderId</span>
                                     </td>
@@ -141,8 +145,8 @@
                                                 _ => "fas fa-question-circle"
                                             };
                                         }
-                                        <span class="badge @statusClass">
-                                            <i class="@statusIcon me-1"></i>@currentStatus
+                                        <span class="badge @statusClass" id="status-badge-@item.OrderId">
+                                            <i class="@statusIcon me-1" id="status-icon-@item.OrderId"></i><span id="status-text-@item.OrderId">@currentStatus</span>
                                         </span>
                                     </td>
                                     <td>
@@ -399,6 +403,76 @@
     .gap-2 { gap: 0.5rem !important; }
     .gap-3 { gap: 1rem !important; }
 
+    /* Toast thông báo cố định góc phải màn hình */
+    .order-toast-container {
+        position: fixed;
+        top: 5.5rem;
+        right: 1.25rem;
+        z-index: 1080;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        max-width: min(420px, calc(100vw - 2rem));
+        pointer-events: none;
+    }
+
+    .order-toast {
+        pointer-events: auto;
+        background: var(--lux-surface, #111);
+        border: 1px solid var(--lux-line, rgba(255,255,255,0.25));
+        color: var(--lux-white, #fff);
+        padding: 0.9rem 1.1rem;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        animation: orderToastIn 0.35s ease;
+    }
+
+    .order-toast--success { border-left: 3px solid #4ade80; }
+    .order-toast--error { border-left: 3px solid #f87171; }
+
+    .order-toast__icon {
+        font-size: 1.1rem;
+        margin-top: 0.1rem;
+        flex-shrink: 0;
+    }
+
+    .order-toast--success .order-toast__icon { color: #4ade80; }
+    .order-toast--error .order-toast__icon { color: #f87171; }
+
+    .order-toast__message {
+        flex: 1;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+
+    .order-toast__close {
+        background: transparent;
+        border: none;
+        color: var(--lux-muted, #b3b3b3);
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+    }
+
+    .order-toast__close:hover { color: var(--lux-white, #fff); }
+
+    .order-toast.is-hiding {
+        animation: orderToastOut 0.35s ease forwards;
+    }
+
+    @@keyframes orderToastIn {
+        from { opacity: 0; transform: translateX(24px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @@keyframes orderToastOut {
+        from { opacity: 1; transform: translateX(0); }
+        to { opacity: 0; transform: translateX(24px); }
+    }
+
     @@media (max-width: 768px) {
         .d-flex.justify-content-between {
             flex-direction: column;
@@ -409,3 +483,131 @@
         .d-flex.align-items-center { flex-wrap: wrap; }
     }
 </style>
+
+@section Scripts {
+    <script>
+        (function () {
+            const statusMeta = {
+                'Chờ xác nhận': { className: 'bg-warning', icon: 'fas fa-clock' },
+                'Đã xác nhận': { className: 'bg-success', icon: 'fas fa-check-circle' },
+                'Đang giao hàng': { className: 'bg-primary', icon: 'fas fa-truck' },
+                'Hoàn thành': { className: 'bg-info', icon: 'fas fa-check-double' },
+                'Đã hủy': { className: 'bg-danger', icon: 'fas fa-times-circle' }
+            };
+
+            const lockedStatuses = ['Hoàn thành', 'Đã hủy'];
+            const toastContainer = document.getElementById('order-toast-container');
+
+            function showOrderToast(message, type) {
+                if (!toastContainer || !message) return;
+
+                const toast = document.createElement('div');
+                toast.className = 'order-toast order-toast--' + (type === 'success' ? 'success' : 'error');
+                toast.innerHTML =
+                    '<i class="order-toast__icon ' + (type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle') + '"></i>' +
+                    '<div class="order-toast__message"></div>' +
+                    '<button type="button" class="order-toast__close" aria-label="Đóng"><i class="fas fa-times"></i></button>';
+                toast.querySelector('.order-toast__message').textContent = message;
+
+                const closeBtn = toast.querySelector('.order-toast__close');
+                const removeToast = function () {
+                    toast.classList.add('is-hiding');
+                    setTimeout(function () { toast.remove(); }, 350);
+                };
+
+                closeBtn.addEventListener('click', removeToast);
+                toastContainer.appendChild(toast);
+                setTimeout(removeToast, 4500);
+            }
+
+            function updateStatusBadge(orderId, status) {
+                const badge = document.getElementById('status-badge-' + orderId);
+                const icon = document.getElementById('status-icon-' + orderId);
+                const text = document.getElementById('status-text-' + orderId);
+                const meta = statusMeta[status];
+                if (!badge || !icon || !text || !meta) return;
+
+                badge.className = 'badge ' + meta.className;
+                icon.className = meta.icon + ' me-1';
+                text.textContent = status;
+            }
+
+            function setFormLocked(form, locked) {
+                const select = form.querySelector('.status-select');
+                const button = form.querySelector('button[type="submit"]');
+                if (select) select.disabled = locked;
+                if (button) button.disabled = locked;
+            }
+
+            document.querySelectorAll('.status-update-form').forEach(function (form) {
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+
+                    const orderId = form.querySelector('input[name="orderId"]')?.value;
+                    const newStatus = form.querySelector('select[name="newStatus"]')?.value;
+                    const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                    const submitBtn = form.querySelector('button[type="submit"]');
+
+                    if (!orderId || !newStatus || !token) return;
+
+                    const originalHtml = submitBtn ? submitBtn.innerHTML : '';
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    }
+
+                    try {
+                        const body = new URLSearchParams();
+                        body.append('orderId', orderId);
+                        body.append('newStatus', newStatus);
+                        body.append('__RequestVerificationToken', token);
+
+                        const response = await fetch('/Orders/UpdateStatus', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: body.toString()
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            if (data.newStatus) {
+                                updateStatusBadge(orderId, data.newStatus);
+                                if (lockedStatuses.includes(data.newStatus)) {
+                                    setFormLocked(form, true);
+                                }
+                            }
+                            showOrderToast(data.message, 'success');
+                        } else {
+                            showOrderToast(data.message || 'Không thể cập nhật trạng thái đơn hàng.', 'error');
+                        }
+                    } catch (err) {
+                        showOrderToast('Có lỗi xảy ra, vui lòng thử lại.', 'error');
+                    } finally {
+                        if (submitBtn) {
+                            submitBtn.disabled = form.querySelector('.status-select')?.disabled ?? false;
+                            submitBtn.innerHTML = originalHtml;
+                        }
+                    }
+                });
+            });
+
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                @:showOrderToast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(successMessage)), 'success');
+            }
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                @:showOrderToast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(errorMessage)), 'error');
+            }
+
+            const alertBox = document.getElementById('order-status-alert');
+            if (alertBox) {
+                alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        })();
+    </script>
+}

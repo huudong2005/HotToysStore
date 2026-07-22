@@ -5,6 +5,11 @@
     var (stockLabel, stockCss) = Model.Stock > 10
         ? ("Còn hàng", "pd-chip--success")
         : Model.Stock > 0 ? ("Sắp hết", "pd-chip--warning") : ("Hết hàng", "pd-chip--danger");
+    var priceHistories = ViewBag.PriceHistories as IEnumerable<ToyStore.Domain.Entities.ProductPriceHistory>
+        ?? Enumerable.Empty<ToyStore.Domain.Entities.ProductPriceHistory>();
+    var chartLabelsJson = ViewBag.PriceChartLabelsJson as string ?? "[]";
+    var chartDataJson = ViewBag.PriceChartDataJson as string ?? "[]";
+    var hasPriceHistory = priceHistories.Any();
 }
 
 <div class="pd container">
@@ -87,6 +92,63 @@
                     }
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Lịch sử biến động giá -->
+    <div class="pd-card pd-price-history mt-4">
+        <div class="pd-history-header">
+            <h4 class="pd-history-title">
+                <i class="fas fa-chart-line me-2"></i> Lịch sử biến động giá
+            </h4>
+            <span class="pd-history-badge">@priceHistories.Count() thay đổi</span>
+        </div>
+
+        <div class="pd-history-body">
+            @if (hasPriceHistory)
+            {
+                <div class="pd-chart-wrap">
+                    <canvas id="priceHistoryChart"></canvas>
+                </div>
+
+                <div class="table-responsive mt-4">
+                    <table class="table pd-history-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th class="text-end">Giá cũ</th>
+                                <th class="text-end">Giá mới</th>
+                                <th class="text-end">Chênh lệch</th>
+                                <th>Người cập nhật</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in priceHistories.OrderByDescending(h => h.ChangedAt))
+                            {
+                                var diff = row.NewPrice - row.OldPrice;
+                                var diffCss = diff > 0 ? "pd-diff--up" : diff < 0 ? "pd-diff--down" : "";
+                                var adminName = row.Admin?.FullName ?? row.Admin?.Username ?? $"Admin #{row.AdminId}";
+                                <tr>
+                                    <td>@row.ChangedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="text-end">@row.OldPrice.ToString("#,##0") ₫</td>
+                                    <td class="text-end fw-semibold">@row.NewPrice.ToString("#,##0") ₫</td>
+                                    <td class="text-end @diffCss">
+                                        @(diff >= 0 ? "+" : "")@diff.ToString("#,##0") ₫
+                                    </td>
+                                    <td>@adminName</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="pd-history-empty">
+                    <i class="fas fa-chart-area fa-2x mb-2"></i>
+                    <p class="mb-0">Chưa có lịch sử thay đổi giá. Biểu đồ sẽ hiển thị sau lần chỉnh sửa giá đầu tiên.</p>
+                </div>
+            }
         </div>
     </div>
 
@@ -223,4 +285,156 @@
         margin-top: 0.5rem;
         line-height: 1.7;
     }
+
+    /* Lịch sử giá */
+    .pd-price-history { padding: 0; }
+
+    .pd-history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .pd-history-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.95rem;
+        margin: 0;
+        color: var(--lux-white, #fff);
+    }
+
+    .pd-history-badge {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0.35rem 0.75rem;
+        border: 1px solid rgba(0, 255, 255, 0.35);
+        color: #00e5ff;
+        background: rgba(0, 229, 255, 0.08);
+    }
+
+    .pd-history-body { padding: 1.5rem; }
+
+    .pd-chart-wrap {
+        position: relative;
+        height: 320px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(0, 255, 255, 0.15);
+        padding: 1rem;
+    }
+
+    .pd-history-table {
+        color: var(--lux-white, #fff);
+        font-size: 0.875rem;
+    }
+
+    .pd-history-table thead th {
+        font-family: 'Montserrat', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.72rem;
+        color: var(--lux-faint, #808080);
+        border-bottom: 1px solid var(--lux-line, rgba(255,255,255,0.12));
+    }
+
+    .pd-history-table tbody td {
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        vertical-align: middle;
+    }
+
+    .pd-diff--up { color: #ff6b6b; }
+    .pd-diff--down { color: #5cd47a; }
+
+    .pd-history-empty {
+        text-align: center;
+        padding: 2.5rem 1rem;
+        color: var(--lux-faint, #808080);
+    }
 </style>
+
+@if (hasPriceHistory)
+{
+    @section Scripts {
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+        <script>
+            (function () {
+                const labels = @Html.Raw(chartLabelsJson);
+                const prices = @Html.Raw(chartDataJson);
+                const canvas = document.getElementById('priceHistoryChart');
+                if (!canvas || !labels.length) return;
+
+                const ctx = canvas.getContext('2d');
+                const neonCyan = '#00e5ff';
+                const neonGold = '#ffd166';
+                const gridColor = 'rgba(255, 255, 255, 0.08)';
+
+                const gradient = ctx.createLinearGradient(0, 0, 0, 320);
+                gradient.addColorStop(0, 'rgba(0, 229, 255, 0.35)');
+                gradient.addColorStop(1, 'rgba(0, 229, 255, 0.02)');
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Giá bán (₫)',
+                            data: prices,
+                            borderColor: neonCyan,
+                            backgroundColor: gradient,
+                            pointBackgroundColor: neonGold,
+                            pointBorderColor: neonCyan,
+                            pointBorderWidth: 2,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            borderWidth: 2.5,
+                            fill: true,
+                            tension: 0.25
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: {
+                                labels: { color: '#ffffff', font: { family: 'Montserrat' } }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(13, 13, 13, 0.95)',
+                                borderColor: 'rgba(0, 229, 255, 0.4)',
+                                borderWidth: 1,
+                                titleColor: '#ffd166',
+                                bodyColor: '#ffffff',
+                                callbacks: {
+                                    label: function (ctx) {
+                                        return ' ' + new Intl.NumberFormat('vi-VN').format(ctx.parsed.y) + ' ₫';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#b3b3b3', maxRotation: 45, minRotation: 0 },
+                                grid: { color: gridColor }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#b3b3b3',
+                                    callback: function (v) {
+                                        return new Intl.NumberFormat('vi-VN').format(v) + ' ₫';
+                                    }
+                                },
+                                grid: { color: gridColor }
+                            }
+                        }
+                    }
+                });
+            })();
+        </script>
+    }
+}
